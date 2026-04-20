@@ -267,6 +267,60 @@ class Maze:
     def _validate_shift_location(self, location):
         self._validate_location(location)
 
+    def pretty_print(self):
+        """ Prints the maze in a 3x3 character grid per card with delimiters. """
+        output = []
+        
+        # Mapping card types and rotations to 3x3 visual representations
+        # Keys are (out_paths, rotation)
+        visuals = {
+            # STRAIGHT (NS)
+            (MazeCard.STRAIGHT, 0):   ["#.#", "#.#", "#.#"],
+            (MazeCard.STRAIGHT, 180): ["#.#", "#.#", "#.#"],
+            (MazeCard.STRAIGHT, 90):  ["###", "...", "###"],
+            (MazeCard.STRAIGHT, 270): ["###", "...", "###"],
+            
+            # CORNER (NE)
+            (MazeCard.CORNER, 0):     ["#.#", "#..", "###"],
+            (MazeCard.CORNER, 90):    ["###", "#..", "#.#"],
+            (MazeCard.CORNER, 180):   ["###", "..#", "#.#"],
+            (MazeCard.CORNER, 270):   ["#.#", "..#", "###"],
+            
+            # T-JUNCTION (NES)
+            (MazeCard.T_JUNCT, 0):    ["#.#", "#..", "#.#"],
+            (MazeCard.T_JUNCT, 90):   ["###", "...", "#.#"],
+            (MazeCard.T_JUNCT, 180):  ["#.#", "..#", "#.#"],
+            (MazeCard.T_JUNCT, 270):  ["#.#", "...", "###"],
+            
+            # CROSS (NESW)
+            (MazeCard.CROSS, 0):      ["#.#", "...", "#.#"],
+        }
+
+        for r in range(self._maze_size):
+            # Each card is 3 characters tall; we build 3 string lines simultaneously
+            row_lines = ["", "", ""]
+            
+            for c in range(self._maze_size):
+                card = self._maze_cards[r][c]
+                
+                # Retrieve visual lines based on actual class properties
+                # We use ._out_paths and ._rotation to match your class definition
+                lookup_key = (card.out_paths, card.rotation)
+                lines = visuals.get(lookup_key, ["???", "? ?", "???"])
+                
+                for i in range(3):
+                    row_lines[i] += lines[i] + "|"
+            
+            output.extend(row_lines)
+            
+            # Build the horizontal divider
+            # Length = (4 chars per card * size) - 1 for the trailing edge
+            divider_len = (self._maze_size * 4) - 1
+            char = "*" if r == self._maze_size - 1 else "|"
+            output.append("-" * divider_len + char)
+
+        print("\n".join(output))
+
 
 class Board:
     """
