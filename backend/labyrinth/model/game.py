@@ -537,6 +537,19 @@ class Player:
     def __hash__(self):
         return hash(self.identifier)
 
+class Adversary(Player):
+    """ This class acts as an adversary for the player.
+
+    Uses same base code as player, but will wait for its turn to come
+    "n" times before shifting a part of the board and proceeding.
+    """
+    def __init__(self, identifier, game=None, player_name=None, attack_in_turns=1):
+        self._turns_passed = -1
+        self._turn_attack = max(1, int(attack_in_turns))
+        super().__init__(identifier, game, None, player_name)
+
+    def register_in_turns(self, turns):
+        turns.add_adversary(self)
 
 class PlayerAction:
     """ This class represent the action of a specific player.
@@ -630,6 +643,14 @@ class Turns:
             self._turn_states.append(PlayerAction(player, PlayerAction.SHIFT_ACTION, turn_callback))
             self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_MOVE, turn_callback))
             self._turn_states.append(PlayerAction(player, PlayerAction.MOVE_ACTION, turn_callback))
+
+    def add_adversary(self, adversary, turn_callback=None):
+        """ Adds an adversary to the turn progression to act in N turns"""
+        turn_prescense = self._turn_states.copy()
+        for i in range(adversary._turn_attack - 1):
+            self._turn_states.extend(turn_prescense)
+        self._turn_states.append(PlayerAction(adversary, PlayerAction.PREPARE_SHIFT, turn_callback))
+        self._turn_states.append(PlayerAction(adversary, PlayerAction.SHIFT_ACTION, turn_callback))
 
     def remove_player(self, player_to_remove):
         """ Removes all PlayerActions with this player. If it was this player's turn to play, the next
