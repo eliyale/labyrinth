@@ -326,6 +326,30 @@ def _zero_heuristic(_state):
     return 0
 
 
+def cheap_heuristic(state):
+    """
+    Very cheap heuristic:
+      - 0 if already on the goal
+      - 1 if goal is reachable by a single MOVE action on the current board
+      - 2 otherwise
+
+    Note: this is intentionally lightweight. It is not guaranteed admissible in all
+    Labyrinth dynamics (a single SHIFT can sometimes place the player on goal).
+    """
+    board = state.board if isinstance(state, State) else state[0]
+    player = state.player if isinstance(state, State) else state[1]
+
+    player_location = board.maze.maze_card_location(player.piece.maze_card)
+    goal_location = board.maze.maze_card_location(board.objective_maze_card)
+    if player_location == goal_location:
+        return 0
+
+    if Graph(board.maze).is_reachable(player_location, goal_location):
+        return 1
+
+    return 2
+
+
 def _format_action(action):
     if action.is_shift():
         return f"SHIFT at {action.shift_location} rot={action.shift_rotation}"
@@ -337,6 +361,7 @@ def _format_action(action):
 def main():
     # Build the search map and objective.
     goal_location = BoardLocation(1, 1)
+    goal_location = BoardLocation(0, 3)
     labyrinth_map = LabyrinthMap(DEMO_MAZE_STRING, goal_location)
 
     # Create a game wrapper so the player gets a valid piece placed on the board.
@@ -350,7 +375,7 @@ def main():
         f=labyrinth_map.apply_action,
         is_goal=labyrinth_map.is_goal,
         actions=labyrinth_map.get_actions,
-        h=_zero_heuristic,
+        h=cheap_heuristic,
         weight=1.0,
     )
 
@@ -359,6 +384,8 @@ def main():
         return
 
     path, action_path = result
+    print("Goal Location:", goal_location)
+    print("Player Location:", game.board.maze.maze_card_location(player.piece.maze_card))
     print(f"Path found. Expanded {len(visited)} states.")
     print(f"Plan length: {len(action_path)} actions, {len(path)} states.")
     for index, action in enumerate(action_path, start=1):
