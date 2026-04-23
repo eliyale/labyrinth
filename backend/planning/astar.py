@@ -4,6 +4,11 @@ A* search algorithm for finding the shortest path in a graph.
 
 import heapq
 
+#Temproary action costs, to be replaced with map-specific costs later
+_ACTION_COSTS = {
+    "go": 1
+}
+
 class SearchNode:
     def __init__(self, s, A=None, parent=None, parent_action=None, cost=0):
         """
@@ -125,6 +130,24 @@ class LabyrinthMap:
 
     def get_cost(self, state, action):
         return self.maze.get_cost(state, action)
+
+def backpath(node):
+    """
+    Reconstruct the state path and action path from the goal node back to start.
+    """
+    path = []
+    action_path = []
+
+    current = node
+    while current is not None:
+        path.append(current.state)
+        if current.parent_action is not None:
+            action_path.append(current.parent_action)
+        current = current.parent
+
+    path.reverse()
+    action_path.reverse()
+    return path, action_path
 
 
 def a_star_search(init_state, f, is_goal, actions, h, weight=1.0):
