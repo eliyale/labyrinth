@@ -362,6 +362,7 @@ def main():
     # Build the search map and objective.
     goal_location = BoardLocation(1, 1)
     goal_location = BoardLocation(0, 3)
+    goal_location = BoardLocation(2, 4)
     labyrinth_map = LabyrinthMap(DEMO_MAZE_STRING, goal_location)
 
     # Create a game wrapper so the player gets a valid piece placed on the board.
