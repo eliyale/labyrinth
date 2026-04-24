@@ -8,6 +8,8 @@ services:
         container_name: labyrinth
         expose:
             - 9112
+        environment:
+            ALLOW_ARBITRARY_ACTION_ORDER: "${ALLOW_ARBITRARY_ACTION_ORDER:-false}"
     nginx:
         build:
             context: ./web-client
