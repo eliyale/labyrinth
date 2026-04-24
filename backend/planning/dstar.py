@@ -67,8 +67,8 @@ class DStarLite:
         labyrinth_map,
         heuristic,
         weight=1.0,
-        max_discovery=8000,
-        max_compute_steps=20000,
+        max_discovery=30000,
+        max_compute_steps=100000,
         max_path_steps=200,
     ):
         self.labyrinth_map = labyrinth_map
