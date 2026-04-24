@@ -103,6 +103,16 @@ def post_move(game_id):
     controller.perform_move(game_id, player_id, request_body)
     return ""
 
+@API.route("/games/<int:game_id>/dstar-demo/step", methods=["POST"])
+def post_dstar_demo_step(game_id):
+    """
+    Advances the D* demo by one planner-selected action.
+
+    Query parameter:
+        p_id: player id
+    """
+    player_id = int(request.args.get("p_id", 0))
+    return controller.perform_dstar_demo_step(game_id, player_id)
 
 @API.route("/computation-methods", methods=["GET"])
 def get_computation_methods():

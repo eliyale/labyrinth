@@ -17,6 +17,18 @@ from labyrinth.model import bots
 
 import labyrinth.event_logging as logging
 
+import pathlib
+from datetime import timedelta
+import sys
+
+from flask import url_for, current_app
+
+if "/app" not in sys.path:
+    sys.path.insert(0, "/app")
+
+from labyrinth.planning.astar import LabyrinthMap, State, cheap_heuristic, _format_action
+from labyrinth.planning.dstar import DStarLite
+
 
 def add_player(game_id, player_request_dto):
     """ Adds a player to a game.
@@ -122,6 +134,60 @@ def perform_move(game_id, player_id, move_dto):
     _try(lambda: interactor.perform_move(game_id, player_id, location))
     DatabaseGateway.get_instance().commit()
 
+def perform_dstar_demo_step(game_id, player_id):
+    """
+    Advances the current browser game by one D* demo step.
+
+    This bypasses the normal /shift and /move API actions and instead uses
+    the planner's board-level transition model:
+        State(board, player) -> LabyrinthMap.apply_action(...)
+    """
+    game = _load_game_or_throw(game_id, for_update=True)
+    player = game.get_player(player_id)
+
+    planner_map = LabyrinthMap.from_existing_board()
+    state = State(game.board, player)
+
+    planner = DStarLite(
+        labyrinth_map=planner_map,
+        heuristic=cheap_heuristic,
+        weight=1.0,
+    )
+
+    result, visited = planner.plan(state)
+
+    if result is None:
+        return {
+            "status": "no_plan",
+            "expandedStates": len(visited),
+            "message": "No D* plan found from the current state.",
+        }
+
+    path, action_path = result
+
+    if len(action_path) == 0:
+        return {
+            "status": "goal_reached",
+            "expandedStates": len(visited),
+            "message": "Player is already at the current goal.",
+        }
+
+    next_action = action_path[0]
+    next_state = planner_map.apply_action(state, next_action)
+
+    # Copy the planner result back into the real game object saved by the backend.
+    game.board = next_state.board
+    game.get_player(player_id).piece = next_state.player.piece
+
+    DatabaseGateway.get_instance().update_game(game_id, game)
+    DatabaseGateway.get_instance().commit()
+
+    return {
+        "status": "step_applied",
+        "expandedStates": len(visited),
+        "planLength": len(action_path),
+        "action": _format_action(next_action),
+    }
 
 def get_computation_methods():
     """ Retrieves the available computation methods.
