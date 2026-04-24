@@ -1,16 +1,28 @@
 '''
 A* search algorithm for finding the shortest path in a graph.
 
-states are (Board, Player) tuples
+states are a State objects with attributes (Board, Player, goal_count, map_ref)
     Board is a Board object.
     Player is a Player object.
+    goal_count is an integer representing the number of goals visited.
+    map_ref is a reference to the LabyrinthMap object to avoid deepcopying the board object in transition function.
 
-The action is selected from [Shift or Move] where
-    Shift is a tuple of (shift_location, shift_rotation)
-        shift_location is a BoardLocation object
-        shift_rotation is an integer from [0, 90, 180, 270]
-    Move is BoardLocation object.
+The action is an Action object with attributes shift_location, shift_rotation, and move_location.
+    shift_location is a BoardLocation object
+    shift_rotation is an integer from [0, 90, 180, 270]
+    move_location is a BoardLocation object.
 
+The transition function is the apply_action method of the LabyrinthMap object.
+
+The heuristic function is the cheap_heuristic method of the LabyrinthMap object.
+
+The weight is a float value for the weighted A* algorithm.
+
+The return value is a tuple of (path, action_path) or (None, visited) if no path can be found.
+
+The path is a list of State objects.
+The action_path is a list of Action objects.
+The visited is a set of State objects.
 '''
 
 import copy
