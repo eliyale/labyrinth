@@ -39,15 +39,21 @@ class Action:
         return self.move_location is not None
 
 class State:
-    def __init__(self, board: Board, player: Player):
+    def __init__(self, board: Board, player: Player, goal_count: int = 0, map_ref=None):
         self.board = board
         self.player = player
+        self.goal_count = goal_count
+        self.map_ref = map_ref
 
     def __eq__(self, other):
-        return self.board == other.board and self.player == other.player
+        return (
+            self.board == other.board
+            and self.player == other.player
+            and self.goal_count == other.goal_count
+        )
 
     def __hash__(self):
-        return hash((self.board, self.player))
+        return hash((self.board, self.player, self.goal_count))
 
     def __str__(self):
         return f"State(board={self.board}, player={self.player})"
@@ -159,11 +165,23 @@ class PriorityQ:
                 return y[0]
 
 class LabyrinthMap:
-    def __init__(self, maze_string: str, goal_location: BoardLocation):
+    """
+    A utility class for managing the labyrinth board and state. Provides metnods
+    used by astar graph search.
+
+    maze_string: str - the string representation of the maze
+    goal_list: list[BoardLocation] - initial locations of ordered goal cards
+    """
+    def __init__(self, maze_string: str, goal_list: list[BoardLocation]):
         self.maze = maze_string
+        self.goal_list = goal_list
+        self.goal_count = len(goal_list)
         maze_card_factory = MazeCardFactory()
         maze = create_maze(maze_string, maze_card_factory)
-        objective_maze_card = maze[goal_location]
+        # Track goal cards by object identity so shifts move goals correctly.
+        self.goal_cards = [maze[goal_location] for goal_location in goal_list]
+        objective_maze_card = self.goal_cards[0]
+        # initialize the board with the first goal location as the objective
         self.board = Board(maze, leftover_card=maze_card_factory.create_instance(MazeCard.STRAIGHT, 0), objective_maze_card=objective_maze_card)
 
     def _board_of(self, state):
@@ -172,15 +190,23 @@ class LabyrinthMap:
     def _player_of(self, state):
         return state.player if isinstance(state, State) else state[1]
 
-    def _make_state(self, board, player, keep_wrapper=False):
-        return State(board, player) if keep_wrapper else (board, player)
+    def _make_state(self, board, player, goal_count, keep_wrapper=False, map_ref=None):
+        return State(board, player, goal_count, map_ref=map_ref) if keep_wrapper else (board, player)
+
+    def _set_objective_from_goal_count(self, board: Board, goal_count: int):
+        """
+        Force board objective to the next ordered target from goal_list.
+        """
+        if goal_count < self.goal_count:
+            board._objective_maze_card = self.goal_cards[goal_count]
 
     def is_goal(self, state):
-        board = self._board_of(state)
-        player = self._player_of(state)
-        goal_location = self.board.maze.maze_card_location(self.board.objective_maze_card)
-        player_location = board.maze.maze_card_location(player.piece.maze_card)
-        return goal_location == player_location
+        # board = self._board_of(state)
+        # player = self._player_of(state)
+        # goal_location = self.board.maze.maze_card_location(self.board.objective_maze_card)
+        # player_location = board.maze.maze_card_location(player.piece.maze_card)
+        # return goal_location == player_location
+        return state.goal_count == self.goal_count
 
     def apply_action(self, state, action):
         # Clone current state to avoid mutating search tree ancestors.
@@ -188,15 +214,24 @@ class LabyrinthMap:
         copied_state = copy.deepcopy(state)
         board = self._board_of(copied_state)
         player = self._player_of(copied_state)
+        goal_count = copied_state.goal_count
+
+        # Keep board objective aligned with ordered-goal progress.
+        self._set_objective_from_goal_count(board, goal_count)
         try:
             if action.is_shift():
                 board.shift(action.shift_location, action.shift_rotation)
             elif action.is_move():
-                board.move(player.piece, action.move_location)
+                reached_goal = board.move(player.piece, action.move_location)
+                if reached_goal and goal_count < self.goal_count:
+                    goal_count += 1
+                    # Override board's internal random next objective with ordered target.
+                    self._set_objective_from_goal_count(board, goal_count)
         except Exception:
             # Invalid actions are treated as no-op transitions by the planner.
             return copied_state
-        return self._make_state(board, player, keep_wrapper=keep_wrapper)
+
+        return self._make_state(board, player, goal_count, keep_wrapper=keep_wrapper, map_ref=self)
 
     def move_cost(self, state: State, action: Action):
         if action.is_shift():
@@ -223,6 +258,12 @@ class LabyrinthMap:
     def neighbor_data(self, state: State):
         for action in self.get_actions(state):
             yield self.apply_action(state, action), action, self.move_cost(state, action)
+
+    def display_map(self, path=[], visited=set(), filename=None):
+        """
+        Visualize the map. Optionally display the resulting plan and visited nodes.
+        """
+        self.board.pretty_print()
 
 def a_star_search(init_state, f, is_goal, actions, h, weight=1.0):
     """
@@ -338,9 +379,20 @@ def cheap_heuristic(state):
     """
     board = state.board if isinstance(state, State) else state[0]
     player = state.player if isinstance(state, State) else state[1]
+    # For ordered-goal planning, compare against the currently active target.
+    if isinstance(state, State) and hasattr(state, "goal_count") and hasattr(state, "map_ref"):
+        if state.goal_count >= state.map_ref.goal_count:
+            return 0
+        goal_card = state.map_ref.goal_cards[state.goal_count]
+        try:
+            goal_location = board.maze.maze_card_location(goal_card)
+        except Exception:
+            # Goal card may be the current leftover card; treat as not directly reachable.
+            return 2
+    else:
+        goal_location = board.maze.maze_card_location(board.objective_maze_card)
 
     player_location = board.maze.maze_card_location(player.piece.maze_card)
-    goal_location = board.maze.maze_card_location(board.objective_maze_card)
     if player_location == goal_location:
         return 0
 
@@ -362,15 +414,16 @@ def main():
     # Build the search map and objective.
     goal_location = BoardLocation(1, 1)
     goal_location = BoardLocation(0, 3)
-    goal_location = BoardLocation(2, 4)
-    labyrinth_map = LabyrinthMap(DEMO_MAZE_STRING, goal_location)
+    # goal_location = BoardLocation(2, 4)
+    goal_list = [BoardLocation(1, 1), BoardLocation(0, 3)]
+    labyrinth_map = LabyrinthMap(DEMO_MAZE_STRING, goal_list)
 
     # Create a game wrapper so the player gets a valid piece placed on the board.
     game = Game(identifier=1, board=labyrinth_map.board, turns=Turns())
     player = Player(identifier=1)
     game.add_player(player)
 
-    init_state = State(game.board, player)
+    init_state = State(game.board, player, map_ref=labyrinth_map)
     result, visited = a_star_search(
         init_state=init_state,
         f=labyrinth_map.apply_action,
