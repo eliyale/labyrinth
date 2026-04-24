@@ -28,3 +28,5 @@ CMakeSettings.json
 
 # vue build output
 web-client/dist
+
+.env
