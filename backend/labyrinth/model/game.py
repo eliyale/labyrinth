@@ -267,60 +267,6 @@ class Maze:
     def _validate_shift_location(self, location):
         self._validate_location(location)
 
-    def pretty_print(self):
-        """ Prints the maze in a 3x3 character grid per card with delimiters. """
-        output = []
-        
-        # Mapping card types and rotations to 3x3 visual representations
-        # Keys are (out_paths, rotation)
-        visuals = {
-            # STRAIGHT (NS)
-            (MazeCard.STRAIGHT, 0):   ["#.#", "#.#", "#.#"],
-            (MazeCard.STRAIGHT, 180): ["#.#", "#.#", "#.#"],
-            (MazeCard.STRAIGHT, 90):  ["###", "...", "###"],
-            (MazeCard.STRAIGHT, 270): ["###", "...", "###"],
-            
-            # CORNER (NE)
-            (MazeCard.CORNER, 0):     ["#.#", "#..", "###"],
-            (MazeCard.CORNER, 90):    ["###", "#..", "#.#"],
-            (MazeCard.CORNER, 180):   ["###", "..#", "#.#"],
-            (MazeCard.CORNER, 270):   ["#.#", "..#", "###"],
-            
-            # T-JUNCTION (NES)
-            (MazeCard.T_JUNCT, 0):    ["#.#", "#..", "#.#"],
-            (MazeCard.T_JUNCT, 90):   ["###", "...", "#.#"],
-            (MazeCard.T_JUNCT, 180):  ["#.#", "..#", "#.#"],
-            (MazeCard.T_JUNCT, 270):  ["#.#", "...", "###"],
-            
-            # CROSS (NESW)
-            (MazeCard.CROSS, 0):      ["#.#", "...", "#.#"],
-        }
-
-        for r in range(self._maze_size):
-            # Each card is 3 characters tall; we build 3 string lines simultaneously
-            row_lines = ["", "", ""]
-            
-            for c in range(self._maze_size):
-                card = self._maze_cards[r][c]
-                
-                # Retrieve visual lines based on actual class properties
-                # We use ._out_paths and ._rotation to match your class definition
-                lookup_key = (card.out_paths, card.rotation)
-                lines = visuals.get(lookup_key, ["???", "? ?", "???"])
-                
-                for i in range(3):
-                    row_lines[i] += lines[i] + "|"
-            
-            output.extend(row_lines)
-            
-            # Build the horizontal divider
-            # Length = (4 chars per card * size) - 1 for the trailing edge
-            divider_len = (self._maze_size * 4) - 1
-            char = "*" if r == self._maze_size - 1 else "|"
-            output.append("-" * divider_len + char)
-
-        print("\n".join(output))
-
 
 class Board:
     """
@@ -363,6 +309,62 @@ class Board:
     def shift_locations(self):
         """ Getter for shift_locations """
         return self._shift_locations
+
+    def _pretty_print_center_overlay(self, location):
+        """Character for the center of a tile: * goal, o one player, @ goal+player(s), x multiple players."""
+        obj_loc = self._maze.maze_card_location(self._objective_maze_card)
+        on_objective = obj_loc == location
+        pieces_here = [
+            piece for piece in self._pieces
+            if self._maze.maze_card_location(piece.maze_card) == location
+        ]
+        if on_objective and pieces_here:
+            return "@"
+        if on_objective:
+            return "*"
+        if len(pieces_here) == 1:
+            return "o"
+        if len(pieces_here) > 1:
+            return "x"
+        return None
+
+    def pretty_print(self):
+        """Prints the maze in a 3x3 grid per tile with delimiters; marks goal as * and a lone player as o."""
+        output = []
+        size = self._maze.maze_size
+        visuals = {
+            (MazeCard.STRAIGHT, 0):   ["#.#", "#.#", "#.#"],
+            (MazeCard.STRAIGHT, 180): ["#.#", "#.#", "#.#"],
+            (MazeCard.STRAIGHT, 90):  ["###", "...", "###"],
+            (MazeCard.STRAIGHT, 270): ["###", "...", "###"],
+            (MazeCard.CORNER, 0):     ["#.#", "#..", "###"],
+            (MazeCard.CORNER, 90):    ["###", "#..", "#.#"],
+            (MazeCard.CORNER, 180):   ["###", "..#", "#.#"],
+            (MazeCard.CORNER, 270):   ["#.#", "..#", "###"],
+            (MazeCard.T_JUNCT, 0):    ["#.#", "#..", "#.#"],
+            (MazeCard.T_JUNCT, 90):   ["###", "...", "#.#"],
+            (MazeCard.T_JUNCT, 180):  ["#.#", "..#", "#.#"],
+            (MazeCard.T_JUNCT, 270):  ["#.#", "...", "###"],
+            (MazeCard.CROSS, 0):      ["#.#", "...", "#.#"],
+        }
+        for r in range(size):
+            row_lines = ["", "", ""]
+            for c in range(size):
+                card = self._maze[BoardLocation(r, c)]
+                lookup_key = (card.out_paths, card.rotation)
+                lines = list(visuals.get(lookup_key, ["???", "? ?", "???"]))
+                overlay = self._pretty_print_center_overlay(BoardLocation(r, c))
+                if overlay:
+                    mid = list(lines[1])
+                    mid[1] = overlay
+                    lines[1] = "".join(mid)
+                for i in range(3):
+                    row_lines[i] += lines[i] + "|"
+            output.extend(row_lines)
+            divider_len = (size * 4) - 1
+            char = "*" if r == size - 1 else "|"
+            output.append("-" * divider_len + char)
+        print("\n".join(output))
 
     def clear_pieces(self):
         """ Removes all pieces currently on the board """
@@ -535,6 +537,19 @@ class Player:
     def __hash__(self):
         return hash(self.identifier)
 
+class Adversary(Player):
+    """ This class acts as an adversary for the player.
+
+    Uses same base code as player, but will wait for its turn to come
+    "n" times before shifting a part of the board and proceeding.
+    """
+    def __init__(self, identifier, game=None, player_name=None, attack_in_turns=1):
+        self._turns_passed = -1
+        self._turn_attack = max(1, int(attack_in_turns))
+        super().__init__(identifier, game, None, player_name)
+
+    def register_in_turns(self, turns):
+        turns.add_adversary(self)
 
 class PlayerAction:
     """ This class represent the action of a specific player.
@@ -628,6 +643,14 @@ class Turns:
             self._turn_states.append(PlayerAction(player, PlayerAction.SHIFT_ACTION, turn_callback))
             self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_MOVE, turn_callback))
             self._turn_states.append(PlayerAction(player, PlayerAction.MOVE_ACTION, turn_callback))
+
+    def add_adversary(self, adversary, turn_callback=None):
+        """ Adds an adversary to the turn progression to act in N turns"""
+        turn_prescense = self._turn_states.copy()
+        for i in range(adversary._turn_attack - 1):
+            self._turn_states.extend(turn_prescense)
+        self._turn_states.append(PlayerAction(adversary, PlayerAction.PREPARE_SHIFT, turn_callback))
+        self._turn_states.append(PlayerAction(adversary, PlayerAction.SHIFT_ACTION, turn_callback))
 
     def remove_player(self, player_to_remove):
         """ Removes all PlayerActions with this player. If it was this player's turn to play, the next

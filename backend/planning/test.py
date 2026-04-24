@@ -117,7 +117,7 @@ def test_player():
 
     print(dir(player.piece.maze_card))
     print("Player location before move:")
-    print(player.piece.maze_card)
+    print(game.board.maze.maze_card_location(player.piece.maze_card))
 
     game_repository = game_repository_coach.when_game_repository_find_by_id_then_return(game)
     interactor = interactors.PlayerActionInteractor(game_repository=game_repository)
@@ -126,7 +126,7 @@ def test_player():
     interactor.perform_shift(game_id=7, player_id=1, shift_location=BoardLocation(0,1), shift_rotation=90)
     # print the maze string representation of the board after this shift, which should show the straight path card at the top of the first column
     print("MAZE STRING")
-    print(board.maze.pretty_print())
+    print(board.pretty_print())
 
     interactor.perform_move(game_id=7, player_id=1, move_location=BoardLocation(0,1))
 
@@ -144,11 +144,80 @@ def test_game():
     print("Game Properties:")
     print(dir(game))
 
+def test_goal():
+    '''
+    Show the properties of the goal, which include the location and the maze card.
+
+    Note that moving a player will return True if the player has reached the goal, False otherwise.
+    '''
+    maze_card_factory = MazeCardFactory()
+    maze = create_maze(MAZE_STRING, maze_card_factory)
+    objective = maze[BoardLocation(1, 1)]
+    board = Board(maze, leftover_card=maze_card_factory.create_instance(MazeCard.STRAIGHT, 0), objective_maze_card=objective)
+    game = Game(identifier=7, board=board, turns=Turns())
+    print("Goal Properties:")
+    print(dir(game.board.objective_maze_card))
+
+    print("MAZE STRING before actions")
+    print(board.pretty_print())
+
+    #should be at (1,1)
+    print("Goal Location before shift:")
+    print(game.board.maze.maze_card_location(game.board.objective_maze_card))
+
+    player = Player(identifier=1, game=0)
+    game.add_player(player)
+
+    print("Player location before move:")
+    print(game.board.maze.maze_card_location(player.piece.maze_card))
+
+    #check if a given state is a goal
+    loc_obj = game.board.maze.maze_card_location(game.board.objective_maze_card)
+    is_goal = loc_obj == BoardLocation(1, 1)
+    print("Is goal?", loc_obj, "== (1, 1)?", is_goal)
+
+    game_repository = game_repository_coach.when_game_repository_find_by_id_then_return(game)
+    interactor = interactors.PlayerActionInteractor(game_repository=game_repository)
+    # Seperate turns object here or should be the same as the one passed to the game??
+    game_repository.turns = Turns()
+    #Must shift befor moving, so test a shift that doesn't effect the player's location
+    interactor.perform_shift(game_id=game.identifier, player_id=1, shift_location=BoardLocation(6,1), shift_rotation=90)
+    #Insert the straight path card at the top of the first column, which will allow the player to move east
+    interactor.perform_move(game_id=game.identifier, player_id=1, move_location=BoardLocation(0,1))
+
+    print("MAZE STRING after actions")
+    print(board.pretty_print())
+    
+    print("Player location after move:")
+    print(game.board.maze.maze_card_location(player.piece.maze_card))
+
+    #The location automatically randomly updates after a move
+    loc_obj = game.board.maze.maze_card_location(game.board.objective_maze_card)
+    print("Goal location after move:", loc_obj)
+
+def test_leftover_card():
+    '''
+    Show the properties of the leftover card
+    '''
+    maze_card_factory = MazeCardFactory()
+    maze = create_maze(MAZE_STRING, maze_card_factory)
+    board = Board(maze, leftover_card=maze_card_factory.create_random_maze_card())
+    game = Game(board)
+    print("Game Properties:")
+    print(dir(game))
+    print("Leftover Card Properties:")
+    print(dir(game.board.leftover_card))
+    print("Leftover Card Location:")
+    print(game.board.leftover_card.location)
+    print("Leftover Card Maze Card:")
+    print(game.board.leftover_card.maze_card)
+
 
 test_board()
 test_graph_data_structure()
 test_bot()
 test_player()
 test_game()
+test_goal()
 
 
