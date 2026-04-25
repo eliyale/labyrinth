@@ -106,20 +106,30 @@ def get_game_state(game_id):
 def perform_shift(game_id, player_id, shift_dto):
     """Performs a shift operation on the game."""
     location, rotation = mapper.dto_to_shift_action(shift_dto)
-    _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
-    _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
-    interactor = interactors.PlayerActionInteractor(game_repository())
-    _try(lambda: interactor.perform_shift(game_id, player_id, location, rotation))
+    if _allow_arbitrary_action_order():
+        game = _load_game_or_throw(game_id)
+        _try(lambda: _perform_shift_without_turn_validation(game, player_id, location, rotation))
+        DatabaseGateway.get_instance().update_game(game_id, game)
+    else:
+        _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
+        _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
+        interactor = interactors.PlayerActionInteractor(game_repository())
+        _try(lambda: interactor.perform_shift(game_id, player_id, location, rotation))
     DatabaseGateway.get_instance().commit()
 
 
 def perform_move(game_id, player_id, move_dto):
     """Performs a move operation on the game."""
     location = mapper.dto_to_move_action(move_dto)
-    _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
-    _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
-    interactor = interactors.PlayerActionInteractor(game_repository())
-    _try(lambda: interactor.perform_move(game_id, player_id, location))
+    if _allow_arbitrary_action_order():
+        game = _load_game_or_throw(game_id)
+        _try(lambda: _perform_move_without_turn_validation(game, player_id, location))
+        DatabaseGateway.get_instance().update_game(game_id, game)
+    else:
+        _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
+        _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
+        interactor = interactors.PlayerActionInteractor(game_repository())
+        _try(lambda: interactor.perform_move(game_id, player_id, location))
     DatabaseGateway.get_instance().commit()
 
 
@@ -182,6 +192,24 @@ def _try(model_operation):
         return model_operation()
     except LabyrinthDomainException as domain_exception:
         raise exceptions.domain_to_api_exception(domain_exception)
+
+
+def _allow_arbitrary_action_order():
+    return bool(current_app.config.get("ALLOW_ARBITRARY_ACTION_ORDER", False))
+
+
+def _perform_shift_without_turn_validation(game, player_id, location, rotation):
+    # Intentionally bypass Turns and pushback rule for planning/replay experiments.
+    game.get_player(player_id)
+    game.board.shift(location, rotation)
+    game.previous_shift_location = location
+
+
+def _perform_move_without_turn_validation(game, player_id, location):
+    player = game.get_player(player_id)
+    reached_goal = game.board.move(player.piece, location)
+    if reached_goal:
+        player.score += 1
 
 
 class URLSupplier:

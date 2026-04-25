@@ -178,6 +178,31 @@ def _wait_for_turn(
     )
 
 
+def _current_player_location(
+    session: requests.Session,
+    base: str,
+    game_id: int,
+    player_id: int,
+) -> Dict[str, int]:
+    response = _fetch_state(session, base, game_id)
+    _raise_for_non_ok(response, f"GET {_state_url(base, game_id)}")
+    state = response.json()
+    players = state.get("players", [])
+    player = next((p for p in players if int(p.get("id", -1)) == player_id), None)
+    if player is None:
+        raise RuntimeError(f"Player {player_id} not found in state for game {game_id}")
+    player_card_id = int(player.get("mazeCardId"))
+
+    maze_cards = state.get("maze", {}).get("mazeCards", [])
+    card = next((c for c in maze_cards if int(c.get("id", -1)) == player_card_id), None)
+    if card is None or card.get("location") is None:
+        raise RuntimeError(
+            f"Could not resolve current location for player {player_id} (card id {player_card_id})"
+        )
+    location = card["location"]
+    return {"row": int(location["row"]), "column": int(location["column"])}
+
+
 def _execute_plan_steps(
     session: requests.Session,
     base: str,
@@ -187,24 +212,49 @@ def _execute_plan_steps(
     wait_timeout_s: float,
     poll_interval_s: float,
     step_delay_s: float,
+    ignore_turn_state: bool,
+    auto_noop_move: bool,
     verbose: bool,
 ) -> None:
+    previous_step_type: Optional[str] = None
     for index, step in enumerate(steps, start=1):
         step_type, payload, expected_action = _step_to_payload(step)
-        _wait_for_turn(
-            session,
-            base,
-            game_id,
-            player_id,
-            expected_action=expected_action,
-            timeout_s=wait_timeout_s,
-            poll_interval_s=poll_interval_s,
-        )
+
+        # Turn normalizer: inject a no-op MOVE between consecutive SHIFTs.
+        if auto_noop_move and not ignore_turn_state and previous_step_type == "shift" and step_type == "shift":
+            noop_location = _current_player_location(session, base, game_id, player_id)
+            _wait_for_turn(
+                session,
+                base,
+                game_id,
+                player_id,
+                expected_action="MOVE",
+                timeout_s=wait_timeout_s,
+                poll_interval_s=poll_interval_s,
+            )
+            noop_url = _move_url(base, game_id, player_id)
+            noop_payload = {"location": noop_location}
+            if verbose:
+                print(f"[inject] POST {noop_url} :: {json.dumps(noop_payload)}")
+            noop_response = session.post(noop_url, json=noop_payload, timeout=10)
+            _raise_for_non_ok(noop_response, f"POST {noop_url}")
+
+        if not ignore_turn_state:
+            _wait_for_turn(
+                session,
+                base,
+                game_id,
+                player_id,
+                expected_action=expected_action,
+                timeout_s=wait_timeout_s,
+                poll_interval_s=poll_interval_s,
+            )
         url = _shift_url(base, game_id, player_id) if step_type == "shift" else _move_url(base, game_id, player_id)
         if verbose:
             print(f"[{index}/{len(steps)}] POST {url} :: {json.dumps(payload)}")
         response = session.post(url, json=payload, timeout=10)
         _raise_for_non_ok(response, f"POST {url}")
+        previous_step_type = step_type
         if step_delay_s > 0 and index < len(steps):
             time.sleep(step_delay_s)
 
@@ -226,6 +276,17 @@ def main() -> None:
     parser.add_argument("--wait-timeout", type=float, default=20.0, help="Seconds to wait for expected nextAction")
     parser.add_argument("--poll-interval", type=float, default=0.1, help="State polling interval in seconds")
     parser.add_argument("--step-delay", type=float, default=0.0, help="Sleep between successful steps")
+    parser.add_argument(
+        "--ignore-turn-state",
+        action="store_true",
+        help="Post plan steps in listed order without waiting for nextAction; use with backend "
+        "ALLOW_ARBITRARY_ACTION_ORDER=True",
+    )
+    parser.add_argument(
+        "--no-auto-noop-move",
+        action="store_true",
+        help="Disable automatic insertion of MOVE(current_location) between consecutive SHIFT steps",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     args = parser.parse_args()
 
@@ -270,6 +331,8 @@ def main() -> None:
             wait_timeout_s=args.wait_timeout,
             poll_interval_s=args.poll_interval,
             step_delay_s=args.step_delay,
+            ignore_turn_state=args.ignore_turn_state,
+            auto_noop_move=not args.no_auto_noop_move,
             verbose=args.verbose,
         )
         print(f"Trial {trial} complete (game={game_id}, player={player_id}, steps={len(steps)}).")

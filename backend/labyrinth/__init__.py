@@ -32,6 +32,8 @@ def create_app(test_config=None):
         SECRET_KEY="dev",
         PROFILE=False,
         ENABLE_INFLUXDB_LOGGING=False,
+        # DEV helper: if True, /shift and /move bypass normal turn-order checks.
+        ALLOW_ARBITRARY_ACTION_ORDER=False,
         JSON_SORT_KEYS=False,
         DATABASE=os.path.join(app.instance_path, "labyrinth.sqlite"),
         LIBRARY_PATH=os.path.join(app.instance_path, "lib"),

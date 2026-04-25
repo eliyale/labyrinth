@@ -10,7 +10,7 @@ the backend directory.
     python -m planning.astar
 
 ## To replay a plan, translate the plan to JSON format found under the plans directory and run
-    backend/planning/run_trial.py \
+    python backend/planning/run_trial.py \
     --plan backend/planning/plans/example_plan.json \
     --base-url http://127.0.0.1 \
     --game-id 0 \
