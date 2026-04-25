@@ -10,7 +10,7 @@ import labyrinth.model.bots
 from labyrinth.mapper.shared import _objective_to_dto, _dto_to_board_location, _board_location_to_dto, _board_to_dto
 from labyrinth.mapper.constants import (ID, OBJECTIVE, PLAYERS, MAZE, NEXT_ACTION, ENABLED_SHIFT_LOCATIONS, LOCATION,
                                         MAZE_CARD_ID, LEFTOVER_ROTATION, KEY, MESSAGE, ACTION, PLAYER_ID,
-                                        MAZE_SIZE, SCORE, PIECE_INDEX, IS_BOT, COMPUTATION_METHOD, PLAYER_NAME)
+                                        MAZE_SIZE, SCORE, PIECE_INDEX, IS_BOT, IS_ADVERSARY, COMPUTATION_METHOD, PLAYER_NAME)
 
 
 def game_state_to_dto(game: Game, remaining: timedelta):
@@ -71,6 +71,7 @@ def dto_to_type(player_request_dto):
     More specifically, returns two values.  """
     if isinstance(player_request_dto, dict):
         is_bot = _value_or_false(player_request_dto, IS_BOT)
+        is_adversary = _value_or_false(player_request_dto, IS_ADVERSARY)
         computation_method = _value_or_none(player_request_dto, COMPUTATION_METHOD)
         return is_bot, computation_method
     return False, None

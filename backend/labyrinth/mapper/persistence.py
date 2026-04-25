@@ -11,7 +11,7 @@ import labyrinth.model.bots as bots
 from labyrinth.mapper.shared import _objective_to_dto, _dto_to_board_location, _board_location_to_dto, _board_to_dto
 from labyrinth.mapper.constants import (ID, OBJECTIVE, PLAYERS, MAZE, NEXT_ACTION, LOCATION, MAZE_CARDS, SHIFT_URL,
                                         PREVIOUS_SHIFT_LOCATION, MAZE_CARD_ID, ACTION, MOVE_URL, OUT_PATHS, ROTATION,
-                                        PLAYER_ID, MAZE_SIZE, SCORE, PIECE_INDEX, IS_BOT, COMPUTATION_METHOD,
+                                        PLAYER_ID, MAZE_SIZE, SCORE, PIECE_INDEX, IS_BOT, IS_ADVERSARY, ATTACK_IN_TURNS, COMPUTATION_METHOD,
                                         TURN_PREPARE_DELAY, LIBRARY_PATH, PLAYER_NAME)
 
 
@@ -99,6 +99,13 @@ def _player_to_dto(player: Player):
         player_dto[LIBRARY_PATH] = player.compute_method_factory.FULL_PATH
         player_dto[SHIFT_URL] = player.shift_url
         player_dto[MOVE_URL] = player.move_url
+    if type(player) is bots.Adversary:
+        player_dto[IS_BOT] = True
+        player_dto[IS_ADVERSARY] = True
+        player_dto[ATTACK_IN_TURNS] = player.get_turns_between_adversary
+        player_dto[COMPUTATION_METHOD] = player.compute_method_factory.SHORT_NAME
+        player_dto[LIBRARY_PATH] = player.compute_method_factory.FULL_PATH
+        player_dto[SHIFT_URL] = player.shift_url
     return player_dto
 
 
@@ -134,15 +141,26 @@ def _dto_to_player(player_dto, board, maze_card_dict):
     player_name = player_dto[PLAYER_NAME]
     player = None
     if IS_BOT in player_dto and player_dto[IS_BOT]:
-        player = bots.create_bot(
-            compute_method=player_dto[COMPUTATION_METHOD],
-            full_path=player_dto[LIBRARY_PATH],
-            url_supplier=None,
-            player_id=player_dto[ID],
-            shift_url=player_dto[SHIFT_URL],
-            move_url=player_dto[MOVE_URL],
-            piece=piece,
-            player_name=player_name)
+        if IS_ADVERSARY in player_dto and player_dto[IS_ADVERSARY]:
+            player = bots.create_adversary(
+                compute_method=player_dto[COMPUTATION_METHOD],
+                full_path=player_dto[LIBRARY_PATH],
+                url_supplier=None,
+                player_id=player_dto[ID],
+                shift_url=player_dto[SHIFT_URL],
+                piece=None,
+                attack_in_turns=player_dto[ATTACK_IN_TURNS],
+                player_name=player_name)
+        else:
+            player = bots.create_bot(
+                compute_method=player_dto[COMPUTATION_METHOD],
+                full_path=player_dto[LIBRARY_PATH],
+                url_supplier=None,
+                player_id=player_dto[ID],
+                shift_url=player_dto[SHIFT_URL],
+                move_url=player_dto[MOVE_URL],
+                piece=piece,
+                player_name=player_name)
     else:
         player = Player(identifier=player_dto[ID], piece=piece, player_name=player_name)
     player.score = player_dto[SCORE]

@@ -30,7 +30,7 @@ def add_player(game_id, player_request_dto):
     _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
     _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
     game = _get_or_create_game(game_id)
-    is_bot, computation_method = mapper.dto_to_type(player_request_dto)
+    is_bot, is_adversary, computation_method = mapper.dto_to_type(player_request_dto)
     player_name = mapper.dto_to_player_name(player_request_dto)
     player_id = _try(game.unused_player_id)
     player = None

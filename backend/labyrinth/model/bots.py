@@ -45,6 +45,14 @@ def create_bot(player_id, compute_method, full_path=None,
                shift_url=shift_url, move_url=move_url,
                identifier=player_id, **kwargs)
 
+def create_adversary(player_id, compute_method, full_path=None,
+               url_supplier=None, shift_url=None, attack_in_turns=1, **kwargs):
+    library_binding_factory = _create_library_binding_factory(expected_library=compute_method, full_path=full_path)
+    return Adversary(library_binding_factory, url_supplier=url_supplier,
+               shift_url=shift_url,
+               attack_in_turns=attack_in_turns,
+               identifier=player_id, **kwargs)
+
 
 def get_available_computation_methods():
     """ Returns the identifiers of the available computation methods.
@@ -159,6 +167,94 @@ class Bot(Player, Thread):
         move_action = choice(tuple(reachable_locations))
         return shift_action, move_action
 
+class Adversary(Player, Thread):
+    """ This class represents an artifical player.
+
+    If the bot is requested to make its action, it starts a thread for time keeping,
+    and a thread for letting the compute method determine the next shift and move action.
+    Computation methods are time-restricted. After the computation timeout, they will be asked to abort.
+    They will then receive a short grace period to finish their current work and return a result.
+    :param library_binding_factory: a method creating a LibraryBinding,
+        It is expected to take a board, a piece, and a game as its parameters.
+    :param kwargs: keyword arguments, which are passed to the Player initializer. game must not be
+        contained in kwargs. Set the game afterwards via set_game instead.
+     """
+
+    COMPUTATION_TIMEOUT = timedelta(seconds=3)
+    WAIT_FOR_RESULT = timedelta(milliseconds=100)
+    MOVE_ACTION_IDLE_TIME = timedelta(seconds=2)
+    ADVERSARY_TURNS = 5
+
+    def __init__(self, library_binding_factory, url_supplier=None, shift_url=None, attack_in_turns=1, **kwargs):
+        Player.__init__(self, **kwargs)
+        Thread.__init__(self)
+        self._library_binding_factory = library_binding_factory
+        self._shift_url = shift_url
+        self._url_supplier = url_supplier
+        self._prepare_delay = timedelta(seconds=0)
+        self._turns_passed = -1
+        self._turn_attack = max(1, int(attack_in_turns))
+
+    def register_in_turns(self, turns: Turns):
+        """ Registers itself in a Turns manager.
+        Overwrites superclass method. """
+        self._prepare_delay = turns.prepare_delay
+        turns.add_adversary(self, turn_callback=self.notify_turn_change)
+
+    def set_game(self, game):
+        """ Sets the API urls.
+        Overwrites superclass method. """
+        Player.set_game(self, game)
+        self._set_urls()
+
+    def notify_turn_change(self, action):
+        if action is PlayerAction.PREPARE_SHIFT:
+            self.start()
+
+    def run(self):
+        compute_method = self._library_binding_factory(self._board, self._piece, self._game)
+        compute_method.start()
+        time.sleep(max(self.COMPUTATION_TIMEOUT, self._prepare_delay).total_seconds())
+        compute_method.abort_search()
+        time.sleep(self.WAIT_FOR_RESULT.total_seconds())
+        shift_action = compute_method.shift_action
+
+        if shift_action is None:
+            shift_action = self.random_actions()
+
+        self._post_shift(*shift_action)
+        time.sleep(max(self.MOVE_ACTION_IDLE_TIME, self._prepare_delay).total_seconds())
+
+    @property
+    def get_turns_between_adversary(self):
+        return self.ADVERSARY_TURNS
+
+    @property
+    def shift_url(self):
+        """ Getter for shift_url """
+        return self._shift_url
+
+    @property
+    def compute_method_factory(self):
+        """ Getter for library_binding_factory, e.g. for serialization """
+        return self._library_binding_factory
+
+    def _post_shift(self, location, rotation):
+        dto = labyrinth.mapper.api.shift_action_to_dto(location, rotation)
+        requests.post(self.shift_url, json=dto)
+
+    def _set_urls(self):
+        if self._game:
+            if not self._shift_url:
+                self._shift_url = self._url_supplier.get_shift_url(self._game.identifier, self.identifier)
+
+    def random_actions(self):
+        board = copy.deepcopy(self._board)
+        shift_location = choice(tuple(self._game.get_enabled_shift_locations()))
+        shift_rotation = choice([0, 90, 180, 270])
+        board.shift(shift_location, shift_rotation)
+        shift_action = (shift_location, shift_rotation)
+        return shift_action
 
 class LibraryBinding(Thread, extlib.ExternalLibraryBinding):
     """ Calls an external library to perform the move. The abort_search method is already

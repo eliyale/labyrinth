@@ -96,17 +96,19 @@ def test_adversary_move():
     interactor.perform_shift(game_id=7, player_id=1, shift_location=BoardLocation(0,5), shift_rotation=90)
     # print the maze string representation of the board after this shift, which should show the straight path card at the top of the first column
     print("MAZE STRING")
-    print(board.maze.pretty_print())
+    print(board.pretty_print())
 
     interactor.perform_move(game_id=7, player_id=1, move_location=BoardLocation(1,3))
 
     interactor.perform_shift(game_id=7, player_id=2, shift_location=BoardLocation(1,0), shift_rotation=0)
 
     print("MAZE STRING")
-    print(board.maze.pretty_print())
+    print(board.pretty_print())
 
     print("Player location after move:")
     print(player.piece.maze_card)
+
+    assert len(game.turns._turn_states) is turn_length * N + 2
 
 
 test_adversary_turns()

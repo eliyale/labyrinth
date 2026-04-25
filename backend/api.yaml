@@ -169,6 +169,10 @@ components:
                     type: "boolean"
                     required: false
                     default: false
+                isAdversary:
+                  type: "boolean"
+                  required: false
+                  default: false
                 computationMethod:
                     type: "string"
                     description: "Method a bot uses to determine game actions. 
