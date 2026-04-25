@@ -9,8 +9,25 @@ the backend directory.
 ## To run the A* graph search on an example maze run
     python -m planning.astar
 
+## To replay a plan, translate the plan to JSON format found under the plans directory and run
+    backend/planning/run_trial.py \
+    --plan backend/planning/plans/example_plan.json \
+    --base-url http://127.0.0.1 \
+    --game-id 0 \
+    --trials 5 \
+    --step-delay 0.2 \
+    -v
+
+The backend still enforces a shift action then a move action, i.e. plans of the form shift move shift move etc.
+I aim to disable this by setting the environment variable below. I reccommend putting this in a .env file at the root
+    ALLOW_ARBITRARY_ACTION_ORDER=true
+
+Also this run_trial.py script does not support adding a maze string or the goal objective yet, I am working on that next.
+
 
 # Notes on planning in the labyrinth board
+
+Here are some notes I've taken about the complexities of what I've implemented
 
 ## Heuristics
 

@@ -18,6 +18,11 @@ Plan format matches replay_plan.py:
     {"type": "move", "row": 0, "column": 1}
   ]
 }
+
+TODO: add a way to specify the goal list for the labyrinth map.
+TODO: add a way to specify the maze string for the labyrinth map.
+TODO: Fix arbitraty action order.
+TODO: Intelligent algorithm that moves closer to the goal before searching
 """
 
 from __future__ import annotations
