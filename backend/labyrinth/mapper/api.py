@@ -73,7 +73,7 @@ def dto_to_type(player_request_dto):
         is_bot = _value_or_false(player_request_dto, IS_BOT)
         is_adversary = _value_or_false(player_request_dto, IS_ADVERSARY)
         computation_method = _value_or_none(player_request_dto, COMPUTATION_METHOD)
-        return is_bot, computation_method
+        return is_bot, is_adversary, computation_method
     return False, None
 
 

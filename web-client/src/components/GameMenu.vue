@@ -33,12 +33,12 @@ export default {
             if (this.gameIsNotFull) {
                 let submenu = this.createAddBotSubmenu();
                 if (submenu.length > 0) {
-                    menu.push(new MenuItem("add", "Add bot..", submenu));
+                    menu.push(new MenuItem("add", "Add adversary..", submenu));
                 }
             }
             let submenu = this.removeBotSubmenu();
             if (submenu.length > 0) {
-                menu.push(new MenuItem("remove", "Remove bot..", submenu));
+                menu.push(new MenuItem("remove", "Remove adversary..", submenu));
             }
             menu.push(
                 new MenuItem("restart", "Restart with..", [
