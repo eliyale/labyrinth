@@ -77,15 +77,38 @@ def change_player_name(game_id, player_id, player_name_dto):
 def change_game(game_id, game_request_dto):
     """ Changes game setup.
 
-    Currently, the only option is to change the maze size.
-    This will restart the game.
+    Body may be either:
+      - {"mazeSize": <int>}  — random layout for that size (existing behavior)
+      - {"mazeString": <str | list[str]>} — fixed layout from ASCII maze (same format as create_maze)
+      - {"MAZE_STRING": <str | list[str]>} — compatibility alias used in some plan files/scripts
+    If both are sent, mazeString takes precedence.
+    This restarts the game with a new board.
     :param game_id: specifies the game. Has to exist.
-    :param game_request_dto: contains the new maze size."""
-    new_size = mapper.dto_to_maze_size(game_request_dto)
+    :param game_request_dto: contains maze options."""
     _ = interactors.OverduePlayerInteractor(game_repository(), logging.get_logger())
     _ = interactors.UpdateOnTurnChangeInteractor(game_repository())
     game = _load_game_or_throw(game_id)
-    new_board = _try(lambda: factory.create_board(maze_size=new_size))
+    maze_string = None
+    if isinstance(game_request_dto, dict):
+        raw_maze = game_request_dto.get("mazeString")
+        if raw_maze is None:
+            raw_maze = game_request_dto.get("MAZE_STRING")
+        if isinstance(raw_maze, list):
+            body = "\n".join(str(line).strip() for line in raw_maze)
+            maze_string = "\n" + body
+        elif raw_maze is not None:
+            maze_string = str(raw_maze)
+    if maze_string is not None:
+        new_board = _try(lambda: factory.create_board_from_maze_string(maze_string))
+    else:
+        if not isinstance(game_request_dto, dict) or "mazeSize" not in game_request_dto:
+            raise exceptions.ApiException(
+                "INVALID_ARGUMENTS",
+                "Expected request body with either 'mazeSize' or 'mazeString'.",
+                400
+            )
+        new_size = mapper.dto_to_maze_size(game_request_dto)
+        new_board = _try(lambda: factory.create_board(maze_size=new_size))
     _try(lambda: game.restart(new_board))
     DatabaseGateway.get_instance().update_game(game_id, game)
     DatabaseGateway.get_instance().commit()

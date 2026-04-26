@@ -8,21 +8,21 @@ actions when nextAction matches the expected player/action.
 It can reset the game each trial, create a fresh player, replay the plan,
 and repeat.
 
-Plan format matches replay_plan.py:
+Plan format matches replay_plan.py, plus optional layout:
+
 {
   "baseUrl": "http://127.0.0.1",
   "gameId": 0,
   "playerId": 1,
+  "mazeString": "\\n###|...",
   "steps": [
     {"type": "shift", "row": 0, "column": 1, "leftoverRotation": 90},
     {"type": "move", "row": 0, "column": 1}
   ]
 }
 
-TODO: add a way to specify the goal list for the labyrinth map.
-TODO: add a way to specify the maze string for the labyrinth map.
-TODO: Fix arbitraty action order.
-TODO: Intelligent algorithm that moves closer to the goal before searching
+If "mazeString" or "MAZE_STRING" is set, run_trial sends PUT /api/games/{id} with {"mazeString": ...}
+before executing steps (each trial if --trials > 1). Same format as labyrinth.model.factories.create_maze.
 """
 
 from __future__ import annotations
@@ -150,6 +150,12 @@ def _reset_game(session: requests.Session, base: str, game_id: int, maze_size: i
     _raise_for_non_ok(response, f"PUT {_change_game_url(base, game_id)}")
 
 
+def _put_game_maze_string(session: requests.Session, base: str, game_id: int, maze_string: str) -> None:
+    """PUT /api/games/{id} with mazeString — server restarts game with that layout."""
+    response = session.put(_change_game_url(base, game_id), json={"mazeString": maze_string}, timeout=60)
+    _raise_for_non_ok(response, f"PUT {_change_game_url(base, game_id)} (mazeString)")
+
+
 def _wait_for_turn(
     session: requests.Session,
     base: str,
@@ -266,7 +272,7 @@ def main() -> None:
     parser.add_argument("--game-id", type=int, default=None, help="Override plan gameId")
     parser.add_argument("--player-id", type=int, default=None, help="Force player id for execution")
     parser.add_argument("--trials", type=int, default=1, help="Number of reset/replay runs")
-    parser.add_argument("--maze-size", type=int, default=7, help="Maze size for reset via PUT /games/{id}")
+    parser.add_argument("--maze-size", type=int, default=7, help="Maze size for reset via PUT /games/{id} when no mazeString")
     parser.add_argument("--no-reset", action="store_true", help="Do not reset game each trial")
     parser.add_argument(
         "--reuse-players",
@@ -302,6 +308,7 @@ def main() -> None:
     plan_player_id = plan.get("playerId")
     explicit_player_id = args.player_id if args.player_id is not None else plan_player_id
     steps: List[Dict[str, Any]] = plan["steps"]
+    maze_string = plan.get("mazeString") or plan.get("MAZE_STRING")
     reset_each_trial = not args.no_reset
     fresh_player = not args.reuse_players
 
@@ -318,9 +325,18 @@ def main() -> None:
             verbose=args.verbose,
         )
         if reset_each_trial:
-            _reset_game(session, base_url, game_id, maze_size=args.maze_size)
+            if maze_string:
+                _put_game_maze_string(session, base_url, game_id, maze_string)
+                if args.verbose:
+                    print(f"Applied mazeString to game {game_id} (PUT /api/games/{game_id})")
+            else:
+                _reset_game(session, base_url, game_id, maze_size=args.maze_size)
+                if args.verbose:
+                    print(f"Reset game {game_id} to mazeSize={args.maze_size}")
+        elif trial == 1 and maze_string:
+            _put_game_maze_string(session, base_url, game_id, maze_string)
             if args.verbose:
-                print(f"Reset game {game_id} to mazeSize={args.maze_size}")
+                print(f"Applied mazeString to game {game_id} (one-shot, no --trials reset)")
 
         _execute_plan_steps(
             session,

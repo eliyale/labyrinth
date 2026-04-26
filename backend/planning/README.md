@@ -14,6 +14,7 @@ the backend directory.
     --plan backend/planning/plans/example_plan.json \
     --base-url http://127.0.0.1 \
     --game-id 0 \
+    --ignore-turn-state \
     --trials 5 \
     --step-delay 0.2 \
     -v

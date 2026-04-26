@@ -15,3 +15,5 @@ UNOBSERVED_GAMES_TIMEDELTA_S = os.environ.get("UNOBSERVED_GAMES_TIMEDELTA_S", de
 UNOBSERVED_GAMES_REMOVE_INTERVAL_S = os.environ.get("UNOBSERVED_GAMES_REMOVE_INTERVAL_S", default=1800)
 
 ALLOW_ARBITRARY_ACTION_ORDER = os.environ.get("ALLOW_ARBITRARY_ACTION_ORDER", default="False").lower() in ("true", "1", "t")
+
+# build step appends SECRET_KEY here

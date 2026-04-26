@@ -141,6 +141,19 @@ def create_board(maze_size=7):
     return Board(maze=maze, leftover_card=leftover)
 
 
+def create_board_from_maze_string(maze_string: str) -> Board:
+    """Build a board from the same ASCII maze format as create_maze(maze_string, ...).
+
+    create_maze ignores the first text line after splitting; if the string does not start with a
+    newline, one is prepended so a typical JSON one-line opening still parses.
+    """
+    text = maze_string if maze_string.startswith("\n") else "\n" + maze_string
+    card_factory = MazeCardFactory()
+    maze = create_maze(text, card_factory)
+    leftover = card_factory.create_instance(MazeCard.STRAIGHT, 0)
+    return Board(maze=maze, leftover_card=leftover)
+
+
 def create_game(maze_size=7, game_id=0, with_delay=True):
     """ Creates a game instance with a random board. Player and piece initialization
     is not done here. """

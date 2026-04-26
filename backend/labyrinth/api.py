@@ -52,11 +52,20 @@ def rename_player(game_id, player_id):
 
 @API.route("/games/<int:game_id>", methods=["PUT"])
 def change_game(game_id):
-    """ Changes game setup. The request has to contain a body of the form
+    """ Changes game setup. The request body may be either:
+
     {
         'mazeSize': <number>
-    },
-    where mazeSize is the new size of the maze.
+    }
+
+    or
+
+    {
+        'mazeString': <string>
+    }
+
+    where mazeString is the ASCII maze format parsed by labyrinth.model.factories.create_maze.
+    If both are present, mazeString wins.
     """
     request_body = request.get_json(force=True)
     controller.change_game(game_id, request_body)
