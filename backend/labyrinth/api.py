@@ -21,6 +21,7 @@ def post_player(game_id):
     The request can contain a body of the form
     {
         'isBot': <boolean>,
+        'isAdversary': <boolean>,
         'computationMethod': <string>,
         'name': <string>
     }

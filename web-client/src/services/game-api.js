@@ -94,6 +94,7 @@ export default {
         axios
             .post(addPlayerPath, {
                 isBot: true,
+                isAdversary: true,
                 computationMethod: computeMethod,
             })
             .catch((error) => this._handleError(error))
