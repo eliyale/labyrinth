@@ -216,11 +216,15 @@ class Adversary(Player, Thread):
         # compute_method.start()
         # time.sleep(max(self.COMPUTATION_TIMEOUT, self._prepare_delay).total_seconds())
         # compute_method.abort_search()
-        # time.sleep(self.WAIT_FOR_RESULT.total_seconds())
         # shift_action = compute_method.shift_action
 
-        if shift_action is None:
-            shift_action = self.random_actions()
+        print(self._board.pretty_print())
+        print("")
+
+        print("Adversary's turn.")
+
+        
+        shift_action = self.random_actions()
 
         self._post_shift(*shift_action)
         time.sleep(max(self.MOVE_ACTION_IDLE_TIME, self._prepare_delay).total_seconds())
@@ -240,8 +244,8 @@ class Adversary(Player, Thread):
     #     return self._library_binding_factory
 
     def _post_shift(self, location, rotation):
-        dto = labyrinth.mapper.api.shift_action_to_dto(location, rotation)
-        requests.post(self.shift_url, json=dto)
+        self._game._turns._next += 1
+        self._game.shift(self._id, location, rotation)
 
     def _set_urls(self):
         if self._game:

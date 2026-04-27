@@ -79,22 +79,24 @@ export const usePlayersStore = defineStore("players", {
             this.setPlayerCard(cardChange);
         },
         enterGame() {
-            if (!this.hasUserPlayer) {
-                const gameStore = useGameStore();
-                if (gameStore.isOnline) {
-                    API.doAddPlayer((apiPlayer) => {
-                        apiPlayer.isUser = true;
-                        this.addPlayer(apiPlayer);
-                    });
-                } else {
-                    const boardStore = useBoardStore();
-                    const playerMazeCard = boardStore.mazeCard({ row: 0, column: 0 });
-                    const player = createPlayer(0);
-                    player.isUser = true;
-                    player.mazeCardId = playerMazeCard.id;
-                    this.addPlayer(player);
-                    gameStore.playerWasAdded();
-                    boardStore.updatePlayers(this.all);
+            for (let index = 0; index < 5; index++) {
+                if (!this.hasUserPlayer) {
+                    const gameStore = useGameStore();
+                    if (gameStore.isOnline) {
+                        API.doAddPlayer((apiPlayer) => {
+                            apiPlayer.isUser = true;
+                            this.addPlayer(apiPlayer);
+                        });
+                    } else {
+                        const boardStore = useBoardStore();
+                        const playerMazeCard = boardStore.mazeCard({ row: 0, column: 0 });
+                        const player = createPlayer(0);
+                        player.isUser = true;
+                        player.mazeCardId = playerMazeCard.id;
+                        this.addPlayer(player);
+                        gameStore.playerWasAdded();
+                        boardStore.updatePlayers(this.all);
+                    }
                 }
             }
         },

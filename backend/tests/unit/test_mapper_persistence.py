@@ -12,10 +12,42 @@ import tests.unit.game_repository_mocks as game_repository_coach
 from labyrinth.model import interactors
 from labyrinth.model.game import Game, MazeCard, BoardLocation, Turns, Player, PlayerAction, Board
 from labyrinth.model.bots import create_bot, create_adversary
-from labyrinth.model.factories import MazeCardFactory
+from labyrinth.model.factories import MazeCardFactory, create_maze
 from flask import Flask
 
 DELAY = timedelta(milliseconds=10)
+
+MAZE_STRING = """
+###|#.#|#.#|###|#.#|#.#|###|
+#..|#..|...|...|#..|..#|..#|
+#.#|###|###|#.#|###|###|#.#|
+---------------------------|
+###|###|#.#|#.#|#.#|#.#|#.#|
+...|...|#.#|#..|#.#|...|..#|
+#.#|#.#|#.#|###|#.#|###|#.#|
+---------------------------|
+#.#|#.#|#.#|#.#|#.#|#.#|#.#|
+#..|#..|..#|#..|..#|#.#|..#|
+#.#|#.#|#.#|#.#|#.#|#.#|#.#|
+---------------------------|
+#.#|#.#|#.#|###|#.#|###|###|
+..#|..#|#..|...|...|...|..#|
+###|#.#|###|#.#|###|#.#|#.#|
+---------------------------|
+###|#.#|###|#.#|###|#.#|###|
+#..|..#|#..|#.#|...|#..|...|
+#.#|###|#.#|#.#|#.#|###|###|
+---------------------------|
+###|#.#|###|#.#|#.#|#.#|#.#|
+..#|#..|...|...|#.#|#..|..#|
+#.#|#.#|###|###|#.#|#.#|#.#|
+---------------------------|
+#.#|#.#|###|###|#.#|#.#|#.#|
+#..|...|...|...|#.#|...|..#|
+###|###|#.#|###|#.#|###|###|
+---------------------------*
+
+"""
 
 
 def _create_test_game(with_bot=False):
@@ -57,17 +89,8 @@ def _create_test_game_adversary(app, with_bot=False):
     """ Creates a Game instance by hand """
     with app.app_context():
         card_factory = MazeCardFactory()
-        board = Board(leftover_card=MazeCard(0, MazeCard.T_JUNCT, 0))
-        for row in range(board.maze.maze_size):
-            for column in range(board.maze.maze_size):
-                if row == 0 and column == 0:
-                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.STRAIGHT, 0)
-                elif row == 1 and column == 1:
-                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.CORNER, 0)
-                elif row == 2 and column == 2:
-                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.T_JUNCT, 270)
-                else:
-                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.T_JUNCT, 0)
+        maze = create_maze(MAZE_STRING, card_factory)
+        board = Board(maze, leftover_card=MazeCard(0, MazeCard.T_JUNCT, 0))
         player_ids = [3]
         players = [Player(identifier=player_id, game=None) for player_id in player_ids]
         if with_bot:
@@ -94,16 +117,85 @@ def _create_test_game_adversary(app, with_bot=False):
         game.previous_shift_location = BoardLocation(0, 3)
         
         #print(len(game.turns._turn_states))
-        print(game.turns._turn_states[game.turns._next])
+        # print(game.turns.next_player_action())
 
-        for _ in range(6):
-            game.shift = Mock()
-            interactor.perform_shift(game_id=7, player_id=3, shift_location=BoardLocation(1, 2), shift_rotation=90)
-            game.move = Mock()
-            interactor.perform_move(game_id=7, player_id=3, move_location=BoardLocation(3, 3))
+        game.shift(42, BoardLocation(0, 1), 0)
 
+        print("Start.")
         print(board.pretty_print())
-        print(game.turns._turn_states)
+
+        print("")
+
+        # Move toward goal
+        print("Player's turn.")
+        game.turns._next += 1
+        game.shift(3, BoardLocation(5, 0), 0)
+        game.turns._next += 1
+        game.move(3, BoardLocation(1, 4))
+        print(board.pretty_print())
+
+        print("")
+
+        print("Player's turn.")
+        game.turns._next += 1
+        game.shift(3, BoardLocation(0, 1), 0)
+        game.turns._next += 1
+        game.move(3, BoardLocation(3, 3))
+        print(board.pretty_print())
+
+        print("")
+
+        print("Player's turn.")
+        game.turns._next += 1
+        game.shift(3, BoardLocation(5, 6), 0)
+        game.turns._next += 1
+        game.move(3, BoardLocation(5, 2))
+        print(board.pretty_print())
+
+        print("")
+
+        print("Player's turn.")
+        game.turns._next += 1
+        game.shift(3, BoardLocation(5, 6), 0)
+        game.turns._next += 1
+        game.move(3, BoardLocation(5, 1))
+        print(board.pretty_print())
+
+        print("")
+
+        
+        print("Player's turn.")
+        game.turns._next += 1
+        game.shift(3, BoardLocation(5, 6), 0)
+        game.turns._next += 1
+        game.move(3, BoardLocation(3, 1))
+        print(board.pretty_print())
+
+        print("")
+
+        #print(game.turns._next)
+        print("Player's turn.")
+        game.shift(3, BoardLocation(5, 6), 0)
+        game.turns._next += 1
+        # print(game.turns.next_player_action())
+        try:
+            game.move(3, BoardLocation(3, 1))
+            print(board.pretty_print())
+        except Exception:
+            game.move(3, BoardLocation(3, 2))
+            print(board.pretty_print())
+        except Exception:
+            game.move(3, BoardLocation(3, 0))
+            print(board.pretty_print())
+        except Exception:
+            game.move(3, BoardLocation(4, 1))
+            print(board.pretty_print())
+
+        print("")
+
+        print("Done")
+        print(board.pretty_print())
+        # print(game.turns._turn_states)
         assert len(game.turns._turn_states) is 4 * 5 + 2
         return game, player_ids
 

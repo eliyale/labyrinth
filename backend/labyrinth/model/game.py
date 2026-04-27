@@ -634,15 +634,10 @@ class Turns:
 
     def add_player(self, player, turn_callback=None):
         """ Adds a player to the turn progression, if he is not present already """
-        already_present = any(
-            player_action.player == player
-            for player_action in self._turn_states
-        )
-        if not already_present:
-            self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_SHIFT, turn_callback))
-            self._turn_states.append(PlayerAction(player, PlayerAction.SHIFT_ACTION, turn_callback))
-            self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_MOVE, turn_callback))
-            self._turn_states.append(PlayerAction(player, PlayerAction.MOVE_ACTION, turn_callback))
+        self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_SHIFT, turn_callback))
+        self._turn_states.append(PlayerAction(player, PlayerAction.SHIFT_ACTION, turn_callback))
+        self._turn_states.append(PlayerAction(player, PlayerAction.PREPARE_MOVE, turn_callback))
+        self._turn_states.append(PlayerAction(player, PlayerAction.MOVE_ACTION, turn_callback))
 
     def add_adversary(self, adversary, turn_callback=None):
         """ Adds an adversary to the turn progression to act in N turns"""
