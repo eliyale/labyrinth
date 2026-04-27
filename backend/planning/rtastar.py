@@ -129,13 +129,16 @@ class RTAStar:
             yield (
                 shifted_state,
                 TurnAction(shift_action, None),
-                self.turn_penalty,
+                self.turn_penalty + self.heuristic(shifted_state),
             )
 
             for move_action in self.labyrinth_map.get_actions(shifted_state):
                 move_location = getattr(move_action, "move_location", None)
 
                 if move_location is None:
+                    continue
+
+                if move_location == player_after_shift:
                     continue
 
                 next_state = self.labyrinth_map.apply_action(

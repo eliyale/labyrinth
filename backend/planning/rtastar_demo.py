@@ -24,7 +24,7 @@ from planning.rtastar import RTAStar, TurnAction
 from labyrinth.model.game import BoardLocation, Game, Player, Turns
 
 
-DEPTH = 2
+DEPTH = 1
 MAX_STEPS = 8
 GOAL_LOCATION = BoardLocation(2, 4)
 
