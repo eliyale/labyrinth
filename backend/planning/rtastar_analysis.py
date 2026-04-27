@@ -23,7 +23,7 @@ CARD_PATTERNS = {
 
 
 LARGE_MAZE_SIZE = 8
-GOAL_LOCATION = BoardLocation(LARGE_MAZE_SIZE - 1, LARGE_MAZE_SIZE - 1)
+GOAL_LOCATION = BoardLocation(5, 4)
 
 DEPTH_VALUES = range(1, 11)
 MAX_STEPS = 40
@@ -273,21 +273,21 @@ def run_depth(depth):
             )
 
         state = apply_turn(labyrinth_map, state, next_action)
-        pair = (
-            planner.player_location(state),
-            planner.goal_location(state),
-        )
+        # pair = (
+        #     planner.player_location(state),
+        #     planner.goal_location(state),
+        # )
 
-        if pair in seen_player_goal_pairs:
-            cycle_detected = True
-            print(
-                f"[depth={depth}] cycle detected at step {step}: "
-                f"player={pair[0]}, goal={pair[1]}, "
-                f"previous_step={seen_player_goal_pairs[pair]}"
-            )
-            break
+        # if pair in seen_player_goal_pairs:
+        #     cycle_detected = True
+        #     print(
+        #         f"[depth={depth}] cycle detected at step {step}: "
+        #         f"player={pair[0]}, goal={pair[1]}, "
+        #         f"previous_step={seen_player_goal_pairs[pair]}"
+        #     )
+        #     break
 
-        seen_player_goal_pairs[pair] = step
+        # seen_player_goal_pairs[pair] = step
         # if step < 3:
         #     print("before leftover:", state.board.extra_maze_card)
 

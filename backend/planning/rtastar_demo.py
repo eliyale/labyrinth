@@ -20,13 +20,18 @@ from planning.astar import (
     DEMO_MAZE_STRING,
 )
 from planning.rtastar import RTAStar, TurnAction
+from planning.rtastar_analysis import build_large_maze_string
 
 from labyrinth.model.game import BoardLocation, Game, Player, Turns
+
+LARGE_MAZE_STRING = build_large_maze_string(8)
 
 
 DEPTH = 1
 MAX_STEPS = 8
 GOAL_LOCATION = BoardLocation(2, 4)
+# GOAL_LOCATION = BoardLocation(5,2)
+
 
 
 def clear_screen():
