@@ -11,10 +11,6 @@
     {
       "row": 0,
       "column": 2
-    },
-    {
-      "row": 1,
-      "column": 1
     }
   ],
   "steps": [
@@ -22,7 +18,7 @@
       "type": "shift",
       "row": 1,
       "column": 0,
-      "leftoverRotation": 0
+      "leftoverRotation": 180
     },
     {
       "type": "move",
@@ -43,22 +39,6 @@
     {
       "type": "move",
       "row": 0,
-      "column": 2
-    },
-    {
-      "type": "goal",
-      "row": 1,
-      "column": 1
-    },
-    {
-      "type": "shift",
-      "row": 6,
-      "column": 5,
-      "leftoverRotation": 0
-    },
-    {
-      "type": "move",
-      "row": 1,
       "column": 2
     }
   ]

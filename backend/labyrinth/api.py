@@ -78,6 +78,20 @@ def get_state(game_id):
     return controller.get_game_state(game_id)
 
 
+@API.route("/games/<int:game_id>/objective", methods=["PUT"])
+def change_objective(game_id):
+    """Set objective maze card location for an existing game.
+
+    Request body:
+    {
+        "location": {"row": <int>, "column": <int>}
+    }
+    """
+    request_body = request.get_json(force=True)
+    controller.change_objective(game_id, request_body)
+    return ""
+
+
 @API.route("/games/<int:game_id>/shift", methods=["POST"])
 def post_shift(game_id):
     """ Makes a shifting action for a player.

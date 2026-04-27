@@ -12,7 +12,7 @@ from labyrinth import exceptions
 from labyrinth.database import DatabaseGateway
 from labyrinth.model.exceptions import LabyrinthDomainException
 from labyrinth.model import interactors
-from labyrinth.model.game import Player
+from labyrinth.model.game import BoardLocation, Player
 from labyrinth.model import bots
 
 import labyrinth.event_logging as logging
@@ -126,6 +126,22 @@ def get_game_state(game_id):
     return game_state
 
 
+def change_objective(game_id, objective_request_dto):
+    """Set board objective to a specific maze location.
+
+    Body:
+      - {"location": {"row": <int>, "column": <int>}}
+      - {"row": <int>, "column": <int>}  (compat)
+    """
+    game = _load_game_or_throw(game_id)
+    location = _parse_objective_location(objective_request_dto)
+    if not game.board.maze.is_inside(location):
+        raise exceptions.ApiException("INVALID_ARGUMENTS", f"Objective location {location} is outside maze.", 400)
+    game.board._objective_maze_card = game.board.maze[location]
+    DatabaseGateway.get_instance().update_game(game_id, game)
+    DatabaseGateway.get_instance().commit()
+
+
 def perform_shift(game_id, player_id, shift_dto):
     """Performs a shift operation on the game."""
     location, rotation = mapper.dto_to_shift_action(shift_dto)
@@ -233,6 +249,27 @@ def _perform_move_without_turn_validation(game, player_id, location):
     reached_goal = game.board.move(player.piece, location)
     if reached_goal:
         player.score += 1
+
+
+def _parse_objective_location(objective_request_dto):
+    if not isinstance(objective_request_dto, dict):
+        raise exceptions.ApiException(
+            "INVALID_ARGUMENTS",
+            "Expected body with objective location.",
+            400,
+        )
+    if isinstance(objective_request_dto.get("location"), dict):
+        raw_location = objective_request_dto["location"]
+    else:
+        raw_location = objective_request_dto
+    try:
+        return BoardLocation(int(raw_location["row"]), int(raw_location["column"]))
+    except (KeyError, TypeError, ValueError):
+        raise exceptions.ApiException(
+            "INVALID_ARGUMENTS",
+            "Expected location with integer row/column.",
+            400,
+        )
 
 
 class URLSupplier:

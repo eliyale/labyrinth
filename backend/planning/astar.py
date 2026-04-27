@@ -412,6 +412,13 @@ DEMO_MAZE_STRING = """
 ---------------------------*
 """
 
+TASK_GOAL_LISTS = {
+    "task1": [BoardLocation(2, 0), BoardLocation(0, 2)],
+    "task2": [BoardLocation(0, 3), BoardLocation(2, 3)],
+    "task3": [BoardLocation(0, 4), BoardLocation(2, 6)],
+    "task4": [BoardLocation(2, 0), BoardLocation(0, 2), BoardLocation(1, 1)],
+}
+
 
 def _zero_heuristic(_state):
     return 0
@@ -593,8 +600,14 @@ def _action_to_plan_steps(action: Action):
     ]
 
 
+def _goal_to_plan_step(goal_location: BoardLocation):
+    return {"type": "goal", "row": goal_location.row, "column": goal_location.column}
+
+
 def _export_plan_json(
     maze_string: str,
+    goal_list,
+    path,
     action_path,
     output_name: str = "astar_generated_plan.json",
     base_url: str = "http://127.0.0.1",
@@ -606,41 +619,28 @@ def _export_plan_json(
     output_path = plan_dir / output_name
 
     steps = []
-    for action in action_path:
+    for index, action in enumerate(action_path):
         steps.extend(_action_to_plan_steps(action))
+        # Insert explicit goal update step when the search transitions to next ordered goal.
+        if index + 1 < len(path):
+            prev_goal_count = path[index].goal_count
+            next_goal_count = path[index + 1].goal_count
+            if next_goal_count > prev_goal_count and next_goal_count < len(goal_list):
+                steps.append(_goal_to_plan_step(goal_list[next_goal_count]))
 
     plan = {
         "baseUrl": base_url,
         "gameId": game_id,
         "playerId": player_id,
         "mazeString": maze_string.strip(),
+        "goals": [{"row": g.row, "column": g.column} for g in goal_list],
         "steps": steps,
     }
     output_path.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
     return output_path
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Run A* planner demo and export a plan JSON.")
-    parser.add_argument(
-        "--heuristic",
-        choices=("zero", "cheap", "one-turn", "hybrid", "manhattan"),
-        default="hybrid",
-        help="Heuristic used by A* (default: hybrid).",
-    )
-    parser.add_argument(
-        "--hybrid-budget",
-        type=int,
-        default=150,
-        help="Number of one-turn checks allowed by hybrid heuristic.",
-    )
-    args = parser.parse_args()
-
-    # Build the search map and objective.
-    goal_list = [BoardLocation(2, 0), BoardLocation(0, 2)]
-    goal_list = [BoardLocation(0, 3), BoardLocation(2, 3)]
-    goal_list = [BoardLocation(0, 4), BoardLocation(2, 6)]
-    goal_list = [BoardLocation(2, 0), BoardLocation(0,2), BoardLocation(1, 1)]
+def _run_single_task(task_name: str, goal_list, args) -> None:
     labyrinth_map = LabyrinthMap(DEMO_MAZE_STRING, goal_list)
 
     # Create a game wrapper so the player gets a valid piece placed on the board.
@@ -660,6 +660,7 @@ def main():
     else:
         heuristic = make_hybrid_heuristic(one_turn_budget=args.hybrid_budget)
 
+    print(f"\n=== {task_name} ===")
     print(f"Heuristic: {args.heuristic}")
     t_search_start = time.perf_counter()
     result, visited = a_star_search(
@@ -691,8 +692,43 @@ def main():
     for index, action in enumerate(action_path, start=1):
         print(f"{index:03d}. {_format_action(action)}")
 
-    exported_path = _export_plan_json(DEMO_MAZE_STRING, action_path)
+    exported_path = _export_plan_json(
+        DEMO_MAZE_STRING,
+        goal_list,
+        path,
+        action_path,
+        output_name="astar_generated_plan.json",
+    )
     print(f"Exported plan JSON: {exported_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run A* planner demo and export a plan JSON.")
+    parser.add_argument(
+        "--heuristic",
+        choices=("zero", "cheap", "one-turn", "hybrid", "manhattan"),
+        default="hybrid",
+        help="Heuristic used by A* (default: hybrid).",
+    )
+    parser.add_argument(
+        "--hybrid-budget",
+        type=int,
+        default=150,
+        help="Number of one-turn checks allowed by hybrid heuristic.",
+    )
+    parser.add_argument(
+        "--task",
+        choices=("task1", "task2", "task3", "task4", "all"),
+        default="task4",
+        help="Which predefined goal task to run (default: task4).",
+    )
+    args = parser.parse_args()
+
+    if args.task == "all":
+        for task_name, goal_list in TASK_GOAL_LISTS.items():
+            _run_single_task(task_name, goal_list, args)
+    else:
+        _run_single_task(args.task, TASK_GOAL_LISTS[args.task], args)
 
 
 if __name__ == "__main__":

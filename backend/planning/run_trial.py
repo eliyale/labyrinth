@@ -21,6 +21,13 @@ Plan format matches replay_plan.py, plus optional layout:
   ]
 }
 
+Optional goal controls:
+  - "goals": [{"row": <int>, "column": <int>}, ...]
+      Applies first goal before steps, then advances to next goal after each goal reached.
+  - explicit step:
+      {"type": "goal", "row": <int>, "column": <int>}
+      Sends PUT /api/games/{id}/objective at that point in the script.
+
 If "mazeString" or "MAZE_STRING" is set, run_trial sends PUT /api/games/{id} with {"mazeString": ...}
 before executing steps (each trial if --trials > 1). Same format as labyrinth.model.factories.create_maze.
 """
@@ -66,6 +73,10 @@ def _move_url(base: str, game_id: int, player_id: int) -> str:
     return f"{base.rstrip('/')}/api/games/{game_id}/move?p_id={player_id}"
 
 
+def _objective_url(base: str, game_id: int) -> str:
+    return f"{base.rstrip('/')}/api/games/{game_id}/objective"
+
+
 def _raise_for_non_ok(response: requests.Response, context: str) -> None:
     if response.ok:
         return
@@ -76,7 +87,7 @@ def _fetch_state(session: requests.Session, base: str, game_id: int) -> requests
     return session.get(_state_url(base, game_id), timeout=10)
 
 
-def _step_to_payload(step: Dict[str, Any]) -> Tuple[str, Dict[str, Any], str]:
+def _step_to_payload(step: Dict[str, Any]) -> Tuple[str, Dict[str, Any], Optional[str]]:
     step_type = (step.get("type") or "").lower()
     if step_type == "shift":
         payload = {
@@ -87,6 +98,9 @@ def _step_to_payload(step: Dict[str, Any]) -> Tuple[str, Dict[str, Any], str]:
     if step_type == "move":
         payload = {"location": {"row": int(step["row"]), "column": int(step["column"])}}
         return step_type, payload, "MOVE"
+    if step_type in ("goal", "objective"):
+        payload = {"location": {"row": int(step["row"]), "column": int(step["column"])}}
+        return "goal", payload, None
     raise ValueError(f"Unknown step type: {step!r}")
 
 
@@ -156,6 +170,11 @@ def _put_game_maze_string(session: requests.Session, base: str, game_id: int, ma
     _raise_for_non_ok(response, f"PUT {_change_game_url(base, game_id)} (mazeString)")
 
 
+def _put_game_objective(session: requests.Session, base: str, game_id: int, location: Dict[str, int]) -> None:
+    response = session.put(_objective_url(base, game_id), json={"location": location}, timeout=10)
+    _raise_for_non_ok(response, f"PUT {_objective_url(base, game_id)}")
+
+
 def _wait_for_turn(
     session: requests.Session,
     base: str,
@@ -209,6 +228,20 @@ def _current_player_location(
     return {"row": int(location["row"]), "column": int(location["column"])}
 
 
+def _player_on_objective(session: requests.Session, base: str, game_id: int, player_id: int) -> bool:
+    response = _fetch_state(session, base, game_id)
+    _raise_for_non_ok(response, f"GET {_state_url(base, game_id)}")
+    state = response.json()
+    objective_id = state.get("objectiveMazeCardId")
+    if objective_id is None:
+        return False
+    players = state.get("players", [])
+    player = next((p for p in players if int(p.get("id", -1)) == player_id), None)
+    if player is None:
+        return False
+    return int(player.get("mazeCardId", -1)) == int(objective_id)
+
+
 def _execute_plan_steps(
     session: requests.Session,
     base: str,
@@ -220,6 +253,8 @@ def _execute_plan_steps(
     step_delay_s: float,
     ignore_turn_state: bool,
     auto_noop_move: bool,
+    goals: Optional[List[Dict[str, int]]],
+    next_goal_index: int,
     verbose: bool,
 ) -> None:
     previous_step_type: Optional[str] = None
@@ -245,7 +280,14 @@ def _execute_plan_steps(
             noop_response = session.post(noop_url, json=noop_payload, timeout=10)
             _raise_for_non_ok(noop_response, f"POST {noop_url}")
 
-        if not ignore_turn_state:
+        if step_type == "goal":
+            _put_game_objective(session, base, game_id, payload["location"])
+            if verbose:
+                print(f"[{index}/{len(steps)}] PUT {_objective_url(base, game_id)} :: {json.dumps(payload)}")
+            previous_step_type = None
+            continue
+
+        if not ignore_turn_state and expected_action is not None:
             _wait_for_turn(
                 session,
                 base,
@@ -261,6 +303,15 @@ def _execute_plan_steps(
         response = session.post(url, json=payload, timeout=10)
         _raise_for_non_ok(response, f"POST {url}")
         previous_step_type = step_type
+
+        # Automatic objective progression for plans with `goals`.
+        if goals and next_goal_index < len(goals) and _player_on_objective(session, base, game_id, player_id):
+            next_goal = goals[next_goal_index]
+            _put_game_objective(session, base, game_id, next_goal)
+            if verbose:
+                print(f"[auto-goal] PUT {_objective_url(base, game_id)} :: {json.dumps({'location': next_goal})}")
+            next_goal_index += 1
+
         if step_delay_s > 0 and index < len(steps):
             time.sleep(step_delay_s)
 
@@ -309,6 +360,11 @@ def main() -> None:
     explicit_player_id = args.player_id if args.player_id is not None else plan_player_id
     steps: List[Dict[str, Any]] = plan["steps"]
     maze_string = plan.get("mazeString") or plan.get("MAZE_STRING")
+    goals_raw = plan.get("goals") or []
+    goals: List[Dict[str, int]] = []
+    for g in goals_raw:
+        if isinstance(g, dict) and "row" in g and "column" in g:
+            goals.append({"row": int(g["row"]), "column": int(g["column"])})
     reset_each_trial = not args.no_reset
     fresh_player = not args.reuse_players
 
@@ -338,6 +394,13 @@ def main() -> None:
             if args.verbose:
                 print(f"Applied mazeString to game {game_id} (one-shot, no --trials reset)")
 
+        next_goal_index = 0
+        if goals:
+            _put_game_objective(session, base_url, game_id, goals[0])
+            next_goal_index = 1
+            if args.verbose:
+                print(f"Applied initial goal to game {game_id}: {goals[0]}")
+
         _execute_plan_steps(
             session,
             base_url,
@@ -349,6 +412,8 @@ def main() -> None:
             step_delay_s=args.step_delay,
             ignore_turn_state=args.ignore_turn_state,
             auto_noop_move=not args.no_auto_noop_move,
+            goals=goals,
+            next_goal_index=next_goal_index,
             verbose=args.verbose,
         )
         time.sleep(1)
