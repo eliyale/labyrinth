@@ -351,6 +351,7 @@ def main() -> None:
             auto_noop_move=not args.no_auto_noop_move,
             verbose=args.verbose,
         )
+        time.sleep(1)
         print(f"Trial {trial} complete (game={game_id}, player={player_id}, steps={len(steps)}).")
 
     print("All trials completed.")
