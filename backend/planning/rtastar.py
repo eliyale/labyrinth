@@ -59,6 +59,24 @@ class RTAStar:
             self.goal_location(state),
         )
     
+    def apply_turn(labyrinth_map, state, turn_action):
+        """
+        Helper to apply turn
+        """
+
+        shifted_state = labyrinth_map.apply_action(
+            state,
+            turn_action.shift_action,
+        )
+
+        if turn_action.move_action is None:
+            return shifted_state
+
+        return labyrinth_map.apply_action(
+            shifted_state,
+            turn_action.move_action,
+        )
+    
     def graph_path(self, graph, source, target):
         """
         Use Graph's internal neighbor structure to reconstruct a path.
