@@ -273,28 +273,6 @@ def run_depth(depth):
             )
 
         state = apply_turn(labyrinth_map, state, next_action)
-        # pair = (
-        #     planner.player_location(state),
-        #     planner.goal_location(state),
-        # )
-
-        # if pair in seen_player_goal_pairs:
-        #     cycle_detected = True
-        #     print(
-        #         f"[depth={depth}] cycle detected at step {step}: "
-        #         f"player={pair[0]}, goal={pair[1]}, "
-        #         f"previous_step={seen_player_goal_pairs[pair]}"
-        #     )
-        #     break
-
-        # seen_player_goal_pairs[pair] = step
-        # if step < 3:
-        #     print("before leftover:", state.board.extra_maze_card)
-
-        # state = apply_turn(labyrinth_map, state, next_action)
-
-        # if step < 3:
-        #     print("after leftover: ", state.board.extra_maze_card)
 
         if labyrinth_map.is_goal(state):
             solved = True

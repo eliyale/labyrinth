@@ -27,7 +27,7 @@ from labyrinth.model.game import BoardLocation, Game, Player, Turns
 LARGE_MAZE_STRING = build_large_maze_string(8)
 
 
-DEPTH = 1
+DEPTH = 2
 MAX_STEPS = 8
 GOAL_LOCATION = BoardLocation(2, 4)
 # GOAL_LOCATION = BoardLocation(5,2)
@@ -122,6 +122,9 @@ def main():
     print_state("INITIAL LABYRINTH STATE", state)
     pause(1)
 
+    demo_start_time = time.perf_counter()
+    total_planning_time = 0.0
+
     for step in range(MAX_STEPS):
         print_state("PLANNING FROM CURRENT STATE", state, step=step)
         pause(0.5)
@@ -129,9 +132,15 @@ def main():
         print("LEFTOVER CARD:")
         print(state.board.leftover_card)
         print("rotation =", state.board.leftover_card.rotation)
+
         print(f"CALLING RTAStar.plan(state), depth={DEPTH}", flush=True)
 
+        planning_start_time = time.perf_counter()
         plan_result = planner.plan(state)
+        planning_elapsed = time.perf_counter() - planning_start_time
+        total_planning_time += planning_elapsed
+
+        print(f"FINISHED RTAStar.plan(state) in {planning_elapsed:.6f} seconds")
 
         print("FINISHED RTAStar.plan(state)", flush=True)
 
@@ -170,7 +179,8 @@ def main():
             action=next_action,
             expanded=len(visited),
         )
-        pause(0.5)
+
+        # pause(0.5)
 
         state = planner.apply_turn(state, next_action)
 
@@ -180,7 +190,7 @@ def main():
             step=step,
             action=next_action,
         )
-        pause(0.5)
+        # pause(0.5)
 
         if labyrinth_map.is_goal(state):
             print_state(
@@ -189,6 +199,11 @@ def main():
                 step=step,
                 action=next_action,
             )
+
+            demo_elapsed = time.perf_counter() - demo_start_time
+
+            print(f"Total wall-clock runtime: {demo_elapsed:.6f} seconds")
+            print(f"Total planning runtime:   {total_planning_time:.6f} seconds")
             break
 
         # potential adversary test.
