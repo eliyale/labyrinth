@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+# import time
 
 import tests.unit.game_repository_mocks as game_repository_coach
 from labyrinth.model import interactors
@@ -24,6 +25,7 @@ def test_perform_shift__calls_shift_on_game(test_setup):
     game, player_action_interactor, _ = test_setup()
     game.shift = Mock()
 
+    # time.sleep(3)
     player_action_interactor.perform_shift(game_id=5, player_id=7,
                                            shift_location=BoardLocation(1, 2), shift_rotation=90)
 

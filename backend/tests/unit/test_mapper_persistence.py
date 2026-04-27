@@ -4,12 +4,16 @@ the methods used to persist a Game instance.
 The tests are performed by creating a Game instance by hand, mapping it to DTO,
 mapping the DTO back to a Game and then asserting the structure of the result """
 from datetime import timedelta
+from unittest.mock import Mock
 import time
 
 import labyrinth.mapper.persistence as mapper
+import tests.unit.game_repository_mocks as game_repository_coach
+from labyrinth.model import interactors
 from labyrinth.model.game import Game, MazeCard, BoardLocation, Turns, Player, PlayerAction, Board
-from labyrinth.model.bots import create_bot
+from labyrinth.model.bots import create_bot, create_adversary
 from labyrinth.model.factories import MazeCardFactory
+from flask import Flask
 
 DELAY = timedelta(milliseconds=10)
 
@@ -48,6 +52,60 @@ def _create_test_game(with_bot=False):
     players[1].score = 8
     game.previous_shift_location = BoardLocation(0, 3)
     return game, player_ids
+
+def _create_test_game_adversary(app, with_bot=False):
+    """ Creates a Game instance by hand """
+    with app.app_context():
+        card_factory = MazeCardFactory()
+        board = Board(leftover_card=MazeCard(0, MazeCard.T_JUNCT, 0))
+        for row in range(board.maze.maze_size):
+            for column in range(board.maze.maze_size):
+                if row == 0 and column == 0:
+                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.STRAIGHT, 0)
+                elif row == 1 and column == 1:
+                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.CORNER, 0)
+                elif row == 2 and column == 2:
+                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.T_JUNCT, 270)
+                else:
+                    board.maze[BoardLocation(row, column)] = card_factory.create_instance(MazeCard.T_JUNCT, 0)
+        player_ids = [3]
+        players = [Player(identifier=player_id, game=None) for player_id in player_ids]
+        if with_bot:
+            # print("Hey")
+            player_ids.append(42)
+            players.append(create_adversary(player_id=42, compute_method="dynamic-foo",
+                                    shift_url="shift-url", attack_in_turns=5))
+        # print(len(players))
+        board._objective_maze_card = board.maze[BoardLocation(1, 4)]
+        turns = Turns(prepare_delay=DELAY, players=players,
+                    next_action=PlayerAction(players[1], PlayerAction.SHIFT_ACTION))
+        game = Game(identifier=7, turns=turns, board=board, players=players)
+        game_repository = game_repository_coach.when_game_repository_find_by_id_then_return(game)
+        interactor = interactors.PlayerActionInteractor(game_repository=game_repository)
+        game_repository.update = Mock()
+        for player in players:
+            player.set_game(game)
+        players[0].piece.maze_card = board.maze[BoardLocation(3, 3)]
+        # players[1].piece.maze_card = board.maze[BoardLocation(5, 5)]
+        players[0].piece.piece_index = 1
+        # players[1].piece.piece_index = 0
+        players[0].score = 7
+        # players[1].score = 8
+        game.previous_shift_location = BoardLocation(0, 3)
+        
+        #print(len(game.turns._turn_states))
+        print(game.turns._turn_states[game.turns._next])
+
+        for _ in range(6):
+            game.shift = Mock()
+            interactor.perform_shift(game_id=7, player_id=3, shift_location=BoardLocation(1, 2), shift_rotation=90)
+            game.move = Mock()
+            interactor.perform_move(game_id=7, player_id=3, move_location=BoardLocation(3, 3))
+
+        print(board.pretty_print())
+        print(game.turns._turn_states)
+        assert len(game.turns._turn_states) is 4 * 5 + 2
+        return game, player_ids
 
 
 def test_mapping_for_player():
@@ -155,3 +213,6 @@ def _assert_games_using_function(game1, game2, func):
     determines if func(game1) == func(game2)
     """
     assert func(game1) == func(game2)
+
+app = Flask(__name__)
+_create_test_game_adversary(app, True)

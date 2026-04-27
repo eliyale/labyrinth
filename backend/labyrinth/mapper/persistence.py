@@ -152,14 +152,14 @@ def _dto_to_player(player_dto, board, maze_card_dict):
                 attack_in_turns=player_dto[ATTACK_IN_TURNS],
                 player_name=player_name)
         else:
-            player = bots.create_bot(
+            player = bots.create_adversary(
                 compute_method=player_dto[COMPUTATION_METHOD],
                 full_path=player_dto[LIBRARY_PATH],
                 url_supplier=None,
                 player_id=player_dto[ID],
                 shift_url=player_dto[SHIFT_URL],
-                move_url=player_dto[MOVE_URL],
-                piece=piece,
+                piece=None,
+                attack_in_turns=player_dto[ATTACK_IN_TURNS],
                 player_name=player_name)
     else:
         player = Player(identifier=player_dto[ID], piece=piece, player_name=player_name)

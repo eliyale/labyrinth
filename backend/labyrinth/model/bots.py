@@ -47,8 +47,8 @@ def create_bot(player_id, compute_method, full_path=None,
 
 def create_adversary(player_id, compute_method, full_path=None,
                url_supplier=None, shift_url=None, attack_in_turns=1, **kwargs):
-    library_binding_factory = _create_library_binding_factory(expected_library=compute_method, full_path=full_path)
-    return Adversary(library_binding_factory, url_supplier=url_supplier,
+    # library_binding_factory = _create_library_binding_factory(expected_library=compute_method, full_path=full_path)
+    return Adversary(None, url_supplier=url_supplier,
                shift_url=shift_url,
                attack_in_turns=attack_in_turns,
                identifier=player_id, **kwargs)
@@ -188,7 +188,7 @@ class Adversary(Player, Thread):
     def __init__(self, library_binding_factory, url_supplier=None, shift_url=None, attack_in_turns=1, **kwargs):
         Player.__init__(self, **kwargs)
         Thread.__init__(self)
-        self._library_binding_factory = library_binding_factory
+        # self._library_binding_factory = library_binding_factory
         self._shift_url = shift_url
         self._url_supplier = url_supplier
         self._prepare_delay = timedelta(seconds=0)
@@ -212,12 +212,12 @@ class Adversary(Player, Thread):
             self.start()
 
     def run(self):
-        compute_method = self._library_binding_factory(self._board, self._piece, self._game)
-        compute_method.start()
-        time.sleep(max(self.COMPUTATION_TIMEOUT, self._prepare_delay).total_seconds())
-        compute_method.abort_search()
-        time.sleep(self.WAIT_FOR_RESULT.total_seconds())
-        shift_action = compute_method.shift_action
+        # compute_method = self._library_binding_factory(self._board, self._piece, self._game)
+        # compute_method.start()
+        # time.sleep(max(self.COMPUTATION_TIMEOUT, self._prepare_delay).total_seconds())
+        # compute_method.abort_search()
+        # time.sleep(self.WAIT_FOR_RESULT.total_seconds())
+        # shift_action = compute_method.shift_action
 
         if shift_action is None:
             shift_action = self.random_actions()
@@ -234,10 +234,10 @@ class Adversary(Player, Thread):
         """ Getter for shift_url """
         return self._shift_url
 
-    @property
-    def compute_method_factory(self):
-        """ Getter for library_binding_factory, e.g. for serialization """
-        return self._library_binding_factory
+    # @property
+    # def compute_method_factory(self):
+    #     """ Getter for library_binding_factory, e.g. for serialization """
+    #     return self._library_binding_factory
 
     def _post_shift(self, location, rotation):
         dto = labyrinth.mapper.api.shift_action_to_dto(location, rotation)

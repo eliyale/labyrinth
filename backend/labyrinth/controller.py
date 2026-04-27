@@ -38,13 +38,16 @@ def add_player(game_id, player_request_dto):
         player = Player(player_id, player_name=player_name)
     else:
         if not is_adversary:
-            player = _try(lambda: bots.create_bot(compute_method=computation_method,
-                                                url_supplier=URLSupplier(), player_id=player_id,
-                                                player_name=player_name))
+            #player = _try(lambda: bots.create_bot(compute_method=computation_method,
+            #                                    url_supplier=URLSupplier(), player_id=player_id,
+            #                                    player_name=player_name))
+            player = _try(lambda: bots.create_adversary(compute_method=computation_method,
+                                                        url_supplier=URLSupplier(), player_id=player_id,
+                                                        player_name=player_name, attack_in_turns=5))
         else:
             player = _try(lambda: bots.create_adversary(compute_method=computation_method,
                                                         url_supplier=URLSupplier(), player_id=player_id,
-                                                        player_name=player_name))
+                                                        player_name=player_name, attack_in_turns=5))
     _try(lambda: game.add_player(player))
     DatabaseGateway.get_instance().update_game(game_id, game)
     DatabaseGateway.get_instance().commit()

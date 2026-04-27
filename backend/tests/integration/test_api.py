@@ -49,6 +49,7 @@ def test_post_players_library_bot(client):
     response = _get_state(client)
     state = response.get_json()
     assert state["players"][1]["isBot"] is True
+    assert state["players"][1]["isAdversary"] is True
     assert state["players"][1]["computationMethod"] == "libexhsearch"
     _wait_for(client, "SHIFT")
 
